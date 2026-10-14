@@ -13,20 +13,6 @@
  *              bridges the front-end with backend data persistence.
  *=============================================================================*/
 
-/*=============================================================================
- * PROJECT: File Based Hangman Game with Player Profiles & Score History
- * COURSE: Programming Fundamentals
- * SECTION: BDS-1A
- * 
- * GROUP MEMBERS:
- *   1. Muhammad Usaid  (26k-2500)
- *   2. Rameez Ahmed    (26k-2527)
- * 
- * FILE: main.c
- * LAST MODIFIED BY: Rameez Ahmed
- * DESCRIPTION: Main Raylib GUI setup and authentication layout rendering.
- *=============================================================================*/
-
 #include "raylib.h"
 #include "backend.h"
 
