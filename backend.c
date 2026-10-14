@@ -20,15 +20,15 @@
 
 //function definition
 int registerUser(const char *username, const char *password){
-    if (strlen(username) == 0 || strlen(password) == 0){
+    if (username == NULL || password == NULL || strlen(username) == 0 || strlen(password) == 0){
         return 0; //Invalid input
     }//end if
 
-    //checking if user exists
+    //checking existing usernames
     FILE *pFile = fopen("players.txt", "r");
     if (pFile != NULL){
         char existingUser[50], existingPass[50];
-        while (fscanf(pFile, "%49s %49s", existingUser, existingPass) == 0){
+        while (fscanf(pFile, "%49s %49s", existingUser, existingPass) ==  2){ //fixed wrong condition as fscanf reads 2 variables here not 0  (10/14/2026)
             if (strcmp(existingUser, username) == 0){
                 fclose(pFile);
                 return -1; //Username taken error
@@ -37,7 +37,7 @@ int registerUser(const char *username, const char *password){
         fclose(pFile);
     }//endif
 
-    //Saving new credentials
+    //appending new credentials 
     pFile = fopen("players.txt", "a");
     if (pFile == NULL){
         return 0;
