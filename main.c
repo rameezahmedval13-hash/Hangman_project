@@ -45,6 +45,13 @@ int main(void) {
     //field focus state 0: none 1: username box 2: password box
     int activeField = 0;
 
+    //On screen feedback status message & color
+    char authStatusMsg[100] = "\0";
+    Color authStatusColor = RED;
+
+    //active loggin in player  profile struct
+    Player loggedInPlayer = {0};
+
     //defining boxes for UI 
     Rectangle usernameBox = { 300, 200, 250, 40 };
     Rectangle passwordBox = { 300, 260, 250, 40 };
@@ -57,18 +64,71 @@ int main(void) {
         Vector2 mousePoint = GetMousePosition();
 
         if (currentScreen == SCREEN_AUTH){
-            //field selection via mouse
-            if(IsMouseButtonPressed((MOUSE_BUTTON_LEFT))){
-                if(CheckCollisionPointRec(mousePoint,usernameBox)){
+            //collision detection flags
+            bool isHoverUsername = CheckCollisionPointRec(mousePoint, usernameBox);
+            bool isHoverPassword = CheckCollisionPointRec(mousePoint, passwordBox); 
+            bool isHoverLogin = CheckCollisionPointRec(mousePoint, loginBtn);
+            bool isHoverRegister = CheckCollisionPointRec(mousePoint, registerBtn);
+
+            //changing cursor visual state over interactive elements
+            if (isHoverUsername || isHoverPassword){
+                SetMouseCursor(MOUSE_CURSOR_IBEAM);
+            }
+            else if(isHoverLogin || isHoverRegister){
+                SetMouseCursor(MOUSE_CURSOR_POINTING_HAND);
+            }
+            else{
+                SetMouseCursor(MOUSE_CURSOR_DEFAULT);
+            }
+
+            if(GetTime() > 0.3 && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)){
+
+                //text field selection
+                if(isHoverUsername){
                     activeField = 1;
+                    authStatusMsg[0] = '\0'; //clear status message on interaction
                 }
-                else if(CheckCollisionPointRec(mousePoint, passwordBox)){
+                else if(isHoverPassword){
                     activeField = 2;
+                    authStatusMsg[0] = '\0';
+                }
+                //login button logic
+                else if(isHoverLogin){
+                    if(usernameLetterCount == 0 || passwordLetterCount == 0){
+                        strcpy(authStatusMsg,"Please fill in all fields!");
+                        authStatusColor = RED;
+                    }else if(loginUser(usernameBuf,passwordBuf, &loggedInPlayer)){
+                        strcpy(authStatusMsg,"Login Successful!");
+                        authStatusColor = GREEN;
+                        currentScreen = SCREEN_MENU;
+                    }else{
+                        strcpy(authStatusMsg,"Invalid username or password.");
+                        authStatusColor = RED;
+                    }
+                }
+                //register button logic
+                else if (isHoverRegister){
+                    if(usernameLetterCount == 0 || passwordLetterCount==0){
+                        strcpy(authStatusMsg, "Please fill in all fields!");
+                        authStatusColor = RED;
+                    }else{
+                        int regStatus = registerUser(usernameBuf, passwordBuf);
+                        if (regStatus == 1){
+                            strcpy(authStatusMsg, "Account created! You can now login.");
+                            authStatusColor = GREEN;
+                        }else if(regStatus == -1){
+                            strcpy(authStatusMsg, "Username already exists!");
+                            authStatusColor = RED;
+                        }else{
+                            strcpy(authStatusMsg, "Error saving account!");
+                            authStatusColor = RED;
+                        }
+                    }
                 }
                 else{
                     activeField = 0; //deselects if clicking outside
                 }//end inner most if
-            }//end inner if
+            }//endif
 
             //toggle via tab key
             if (IsKeyPressed(KEY_TAB)){
@@ -108,15 +168,17 @@ int main(void) {
 
         }//endif
 
-        //begin drawing frame buffer
+        //----BEGIN DRAWING FRAME BUFFER-----
         BeginDrawing();
         ClearBackground(RAYWHITE);
 
         //authentication screen rendering
         if (currentScreen == SCREEN_AUTH) {
             // main title and section header
-            DrawText("HANGMAN GAME", 280, 80, 34, DARKBLUE);
-            DrawText("Player Portal", 345, 125, 20, GRAY);
+            const char *title = "HANGMAN GAME";
+            DrawText(title, (screenWidth-MeasureText(title,34))/2, 80, 34, DARKBLUE);
+            const char *subtitle = "Player Portal";
+            DrawText(subtitle, (screenWidth-MeasureText(subtitle,20))/2, 125, 20, GRAY);
 
             //Text input field labels
             DrawText("Username:", 180, 210, 20, DARKGRAY);
@@ -145,6 +207,22 @@ int main(void) {
             DrawRectangleRec(registerBtn, GREEN);
             DrawText("REGISTER", (int)registerBtn.x + 12, (int)registerBtn.y + 12, 18, WHITE);
 
+            //On-screen feedback msg
+            if(strlen(authStatusMsg)> 0){
+                int msgWidth = MeasureText(authStatusMsg,18);
+                DrawText(authStatusMsg, (screenWidth-msgWidth)/2, 395, 18, authStatusColor);
+            }
+        }
+        else if(currentScreen == SCREEN_MENU){
+            //Main menu state - active player profile display 
+            const char *menuTitle = "MAIN MENU";
+            DrawText(menuTitle, (screenWidth-MeasureText(menuTitle,32))/2, 150,32, DARKBLUE);
+            const char *welcomeStr = TextFormat("Welcome, %s!", loggedInPlayer.username);
+            DrawText(welcomeStr,(screenWidth-MeasureText(welcomeStr, 22))/2,220,22,DARKGRAY);
+            const char *statsStr = TextFormat("Wins: %d  |  Losses: %d  |  Score: %d",loggedInPlayer.wins,loggedInPlayer.losses,loggedInPlayer.score);
+            DrawText(statsStr,(screenWidth-MeasureText(statsStr, 20))/2,260,20,GRAY);
+            const char *exitHint = "Press ESC to exit application";
+            DrawText(exitHint, (screenWidth-MeasureText(exitHint,18))/2, 340, 18, LIGHTGRAY);
         }
         //output rendered frame to screen
         EndDrawing();
