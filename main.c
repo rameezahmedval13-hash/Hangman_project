@@ -24,6 +24,38 @@ typedef enum {
     SCREEN_GAME
 } GameScreen;
 
+//Game state variables
+char secretWord[50] = "";
+char displayWord[50] = "";
+bool guessedLetters[26] = { false };
+int wrongAttempts = 0;
+const int maxAttempts = 6;
+bool gameOver = false;
+bool gameWon = false;
+
+//reset board state and fetch a fresh word from backend [DATE: 10/20/2026][MODIFIED BY: Rameez Ahmed]
+void startNewGame(void){
+    if(!getRandomWord(secretWord)){
+        strcpy(secretWord, "HANGMAN"); //Fallback if words.txt fails to open
+    }//endif
+
+    int len = strlen(secretWord);
+    for(int i = 0;i<len;i++){
+        displayWord[i] = '_';
+    }//endfor
+    displayWord[len] = '\0';
+
+    for(int i=0;i<26;i++){
+        guessedLetters[i] = false;
+    }//endfor
+    
+    wrongAttempts = 0;
+    gameOver = false;
+    gameWon = false;
+
+}//end function
+
+
 int main(void) {
     //window initialization
     const int screenWidth = 800;
@@ -57,6 +89,8 @@ int main(void) {
     Rectangle passwordBox = { 300, 260, 250, 40 };
     Rectangle loginBtn    = { 300, 330, 115, 45 };
     Rectangle registerBtn = { 435, 330, 115, 45 };
+    Rectangle playBtn = {310,290,180,50};
+    Rectangle backBtn = {310,480,180,40};
     
     //main application loop
     while (!WindowShouldClose()) {
@@ -167,6 +201,70 @@ int main(void) {
             }//endif
 
         }//endif
+        else if(currentScreen == SCREEN_MENU){
+            bool isHoverPlay = CheckCollisionPointRec(mousePoint, playBtn);
+            if(isHoverPlay){
+                SetMouseCursor(MOUSE_CURSOR_POINTING_HAND);
+                if(IsMouseButtonPressed(MOUSE_BUTTON_LEFT)){
+                    startNewGame();
+                    currentScreen = SCREEN_GAME;
+                }
+            }else{
+                SetMouseCursor(MOUSE_CURSOR_DEFAULT);
+            }
+        }
+        else if (currentScreen == SCREEN_GAME){
+            bool isHoverBack = CheckCollisionPointRec(mousePoint,backBtn);
+            if(isHoverBack){
+                SetMouseCursor(MOUSE_CURSOR_POINTING_HAND);
+                if(IsMouseButtonPressed(MOUSE_BUTTON_LEFT)){
+                    currentScreen = SCREEN_MENU;
+                }
+            }else{
+                SetMouseCursor(MOUSE_CURSOR_DEFAULT);
+            }
+
+            //game input processing
+            if(!gameOver){
+                int key = GetCharPressed();
+                while(key>0){
+                    if(key>='a' && key <= 'z') key -= 32; //converting to uppercase
+                    
+                    if(key>='A'&& key<= 'Z'){
+                        int letterIdx = key - 'A';
+                        if (!guessedLetters[letterIdx]){
+                            guessedLetters[letterIdx] = true;
+
+                            bool match = false;
+                            int len = strlen(secretWord);
+                            for(int i = 0;i<len;i++){
+                                if(secretWord[i] == key){
+                                    displayWord[i] = key;
+                                    match = true;
+                                }//endif
+                            }//endfor
+
+                            if (!match){
+                                wrongAttempts++;
+                                if(wrongAttempts >= maxAttempts){
+                                    gameOver = true;
+                                    gameWon = false;
+                                }//endif
+                            }else if(strcmp(secretWord, displayWord) == 0){
+                                gameOver = true;
+                                gameWon = true;
+                            }
+                        }//endif
+                    }//endif
+                    key = GetCharPressed();
+                }//endwhile
+            }else{
+                //press 'R' to restart game after win or loss
+                if(IsKeyPressed(KEY_R)){
+                    startNewGame();
+                }//endif
+            }//endif
+        }//endif
 
         //----BEGIN DRAWING FRAME BUFFER-----
         BeginDrawing();
@@ -213,16 +311,74 @@ int main(void) {
                 DrawText(authStatusMsg, (screenWidth-msgWidth)/2, 395, 18, authStatusColor);
             }
         }
+        //Main menu rendering
         else if(currentScreen == SCREEN_MENU){
             //Main menu state - active player profile display 
             const char *menuTitle = "MAIN MENU";
             DrawText(menuTitle, (screenWidth-MeasureText(menuTitle,32))/2, 150,32, DARKBLUE);
+
             const char *welcomeStr = TextFormat("Welcome, %s!", loggedInPlayer.username);
             DrawText(welcomeStr,(screenWidth-MeasureText(welcomeStr, 22))/2,220,22,DARKGRAY);
+            
             const char *statsStr = TextFormat("Wins: %d  |  Losses: %d  |  Score: %d",loggedInPlayer.wins,loggedInPlayer.losses,loggedInPlayer.score);
             DrawText(statsStr,(screenWidth-MeasureText(statsStr, 20))/2,260,20,GRAY);
+            
             const char *exitHint = "Press ESC to exit application";
-            DrawText(exitHint, (screenWidth-MeasureText(exitHint,18))/2, 340, 18, LIGHTGRAY);
+            DrawText(exitHint, (screenWidth-MeasureText(exitHint,18))/2, 400, 18, LIGHTGRAY);
+
+            //Play game action button
+            DrawRectangleRec(playBtn, DARKBLUE);
+            const char *btnText = "PLAY GAME";
+            int btnTextWidth = MeasureText(btnText,20);
+            DrawText(btnText, (int)playBtn.x + ((int)playBtn.width-btnTextWidth)/2, (int)playBtn.y + 15,20,WHITE);
+
+        }
+        //Gameplay screen rendering
+        else if(currentScreen == SCREEN_GAME){
+            const char *gameTitle = "HANGMAN GAMEPLAY";
+            DrawText(gameTitle, (screenWidth-MeasureText(gameTitle,28))/2,50,28,DARKBLUE);
+
+            //Display secret word with space padding (e.g. "_ _ A _ _")
+            char formattedWord[100] = "";
+            int len = strlen(displayWord);
+            for (int i = 0; i<len;i++){
+                char temp[3] = { displayWord[i], ' ', '\0'};
+                strcat(formattedWord, temp);
+            }//endfor
+            DrawText(formattedWord, (screenWidth-MeasureText(formattedWord, 36))/2,150,36,BLACK);
+
+            //Attempts counter
+            const char *attemptsStr = TextFormat("Wrong Attempts: %d / %d", wrongAttempts, maxAttempts);
+            DrawText(attemptsStr, (screenWidth-MeasureText(attemptsStr,20))/2,230,20,(wrongAttempts >=4)?RED:DARKGRAY);
+
+            //Display Guessed Keyboard Letters
+            char guessedStr[100] = "Guessed: ";
+            for(int i = 0; i<26;i++){
+                if(guessedLetters[i]){
+                    char ltr[3] = { (char)('A' + i ), ' ', '\0'};
+                    strcat(guessedStr, ltr);
+                }//endif
+            }//endfor
+            DrawText(guessedStr, (screenWidth-MeasureText(guessedStr, 18))/2,290,18,GRAY);
+
+            //Game over/victory banner
+            if(gameOver){
+                if(gameWon){
+                    const char *winText = "YOU WON! Press 'R' to play again.";
+                    DrawText(winText, (screenWidth-MeasureText(winText,22))/2,350,22,GREEN);
+                }else{
+                    const char *lossText = TextFormat("GAME OVER! Word was: %s. Press 'R' to try again.",secretWord);
+                    DrawText(lossText, (screenWidth-MeasureText(lossText,20))/2,350,20,RED);
+                }
+            }else{
+                DrawText("Type any letter A-Z on your keyboard to guess!", (screenWidth-MeasureText("Type any letter A-Z on your keyboard to guess!",16))/2,350,16,LIGHTGRAY);
+            }
+
+            //Back to Menu Button
+            DrawRectangleRec(backBtn, GRAY);
+            const char *backText = "BACK TO MENU";
+            int backTextWidth = MeasureText(backText,16);
+            DrawText(backText, (int)backBtn.x + ((int)backBtn.width-backTextWidth)/2, (int)backBtn.y + 12,16,WHITE);
         }
         //output rendered frame to screen
         EndDrawing();
