@@ -17,6 +17,8 @@
 #include "backend.h"
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
+#include <time.h>
 
 //function definition
 int registerUser(const char *username, const char *password){
@@ -104,3 +106,37 @@ int loginUser(const char *username, const char *password, Player *player){
 
     return 1;
 }//end function
+
+//function definition [DATE: 10/20/2026][MODIFIED BY: RAMEEZ AHMED]
+int getRandomWord(char *outWord){
+    if(outWord == NULL){
+        return 0; // invalid pointer
+    }//endif
+
+    FILE *pFile = fopen("words.txt","r");
+    if (pFile == NULL){
+        return 0; //file read error
+    }//endif
+
+    char words[100][50];
+    int count = 0;
+
+    //Read all words from words.txt into memory
+    while(fscanf(pFile, "%49s", words[count]) == 1 && count < 100){
+        count++;
+    }//endwhile
+    fclose(pFile);
+
+    if(count==0){
+        return 0; //empty file error
+    }//endif
+
+    //seed rng and select a random word index
+    srand((unsigned int)time(NULL));
+    int randomIndex = rand() % count;
+
+    strcpy(outWord, words[randomIndex]);
+    return 1; //success
+}//endfunction
+
+

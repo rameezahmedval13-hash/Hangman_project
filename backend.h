@@ -25,26 +25,11 @@ typedef struct {
     int score;
 } Player;
 
-// Authentication prototypes
+//Authentication prototypes
 int registerUser(const char *username, const char *password);
 int loginUser(const char *username, const char *password, Player *player);
 
-#endif
+//Word Engine Prototypes [DATE: 10/20/2026 MODIFIED BY: RAMEEZ AHMED]
+int getRandomWord(char *outWord);
 
-
-#ifndef BACKEND_H
-#define BACKEND_H
-
-typedef struct {
-    char username[50];
-    int total_games;
-    int wins;
-    int losses;
-    int score;
-}Player;
-
-//function declarations to use in main.c 
-int registerUser(const char *username, const char *password);
-int loginUser(const char *username, const char *password, Player *player);
-
-#endif //end of #ifndef
+#endif  //end of #ifndef
