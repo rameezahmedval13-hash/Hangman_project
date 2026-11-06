@@ -19,14 +19,26 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <stdio.h>
+#include <time.h>
 
 //enum datatype to manage screen state transitions
 typedef enum {
     SCREEN_AUTH = 0,
     SCREEN_MENU,
+    SCREEN_DIFFICULTY,
     SCREEN_GAME,
     SCREEN_LEADERBOARD
 } GameScreen;
+
+// Difficulty levels [DATE: 11/06/2026][MODIFIED BY: MUHAMMAD USAID]
+typedef enum {
+    DIFFICULTY_EASY = 0,
+    DIFFICULTY_MEDIUM,
+    DIFFICULTY_HARD
+} Difficulty;
+
+Difficulty selectedDifficulty = DIFFICULTY_MEDIUM;
 
 //Game state variables
 char secretWord[50] = "";
@@ -62,6 +74,51 @@ void DrawHangman(int strikes){
 
 }//end function
 
+// Select a random word according to difficulty
+// [DATE: 11/06/2026][MODIFIED BY: MUHAMMAD USAID]
+int getWordByDifficulty(char *outWord, Difficulty difficulty){
+    if(outWord == NULL){
+        return 0;
+    }
+    int minLength, maxLength;
+    if(difficulty == DIFFICULTY_EASY){
+        minLength = 4;
+        maxLength = 5;
+    }
+    else if(difficulty == DIFFICULTY_MEDIUM){
+        minLength = 6;
+        maxLength = 8;
+    }
+    else{
+        minLength = 9;
+        maxLength = 49;
+    }
+    FILE *file = fopen("words.txt", "r");
+    if(file == NULL){
+        return 0;
+    }
+    char word[50];
+    char selectedWord[50];
+    int count = 0;
+
+    // Reservoir sampling: randomly select one matching word
+    while(fscanf(file, "%49s", word) == 1){
+        int length = strlen(word);
+        if(length >= minLength && length <= maxLength){
+            count++;
+            if(rand() % count == 0){
+                strcpy(selectedWord, word);
+            }
+        }
+    }
+    fclose(file);
+    if(count == 0){
+        return 0;
+    }
+    strcpy(outWord, selectedWord);
+    return 1;
+}
+
 //Generate sound effects in memory [DATE: 11/06/2026][MODIFIED BY: MUHAMMAD USAID]
 Sound GenerateTone(int frequency, float duration, float volume){
 
@@ -96,8 +153,16 @@ Sound GenerateTone(int frequency, float duration, float volume){
 
 //reset board state and fetch a fresh word from backend [DATE: 10/20/2026][MODIFIED BY: Rameez Ahmed]
 void startNewGame(void){
-    if(!getRandomWord(secretWord)){
-        strcpy(secretWord, "HANGMAN"); //Fallback if words.txt fails to open
+    if(!getWordByDifficulty(secretWord, selectedDifficulty)){
+        if(selectedDifficulty == DIFFICULTY_EASY){
+            strcpy(secretWord, "APPLE");
+        }
+        else if(selectedDifficulty == DIFFICULTY_MEDIUM){
+            strcpy(secretWord, "POINTER");
+        }
+        else{
+            strcpy(secretWord, "PROGRAMMING");
+        }
     }//endif
 
     int len = strlen(secretWord);
@@ -128,6 +193,7 @@ int main(void) {
     //creating display window with dimensions and title
     InitWindow(screenWidth, screenHeight, "Hangman Game");
     SetTargetFPS(60); //capping rendering speed to 60 FPS
+    srand((unsigned int)time(NULL));
 
     //Initialize audio and generate game sounds [DATE: 11/06/2026][MODIFIED BY: MUHAMMAD USAID]
     InitAudioDevice();
@@ -168,6 +234,12 @@ int main(void) {
     Rectangle leaderboardBtn = {310,355,180,50};
     Rectangle backBtn = {310,480,180,40};
     Rectangle leaderboardBackBtn = {310,480,180,40};
+
+    // Difficulty selection buttons
+    Rectangle easyBtn = {310, 230, 180, 50};
+    Rectangle mediumBtn = {310, 300, 180, 50};
+    Rectangle hardBtn = {310, 370, 180, 50};
+    Rectangle difficultyBackBtn = {310, 460, 180, 40};
     
     //main application loop
     while (!WindowShouldClose()) {
@@ -284,8 +356,7 @@ int main(void) {
             if(isHoverPlay){
                 SetMouseCursor(MOUSE_CURSOR_POINTING_HAND);
                 if(IsMouseButtonPressed(MOUSE_BUTTON_LEFT)){
-                    startNewGame();
-                    currentScreen = SCREEN_GAME;
+                    currentScreen = SCREEN_DIFFICULTY;
                 }
             }
             else if(isHoverLeaderboard){
@@ -297,6 +368,39 @@ int main(void) {
             }
             else{
                 SetMouseCursor(MOUSE_CURSOR_DEFAULT);
+            }
+        }
+        // Difficulty selection screen input handling
+        else if(currentScreen == SCREEN_DIFFICULTY){
+            bool hoverEasy = CheckCollisionPointRec(mousePoint, easyBtn);
+            bool hoverMedium = CheckCollisionPointRec(mousePoint, mediumBtn);
+            bool hoverHard = CheckCollisionPointRec(mousePoint, hardBtn);
+            bool hoverBack = CheckCollisionPointRec(mousePoint, difficultyBackBtn);
+            if(hoverEasy || hoverMedium || hoverHard || hoverBack){
+                SetMouseCursor(MOUSE_CURSOR_POINTING_HAND);
+            }
+            else{
+                SetMouseCursor(MOUSE_CURSOR_DEFAULT);
+            }
+            if(IsMouseButtonPressed(MOUSE_BUTTON_LEFT)){
+                if(hoverEasy){
+                    selectedDifficulty = DIFFICULTY_EASY;
+                    startNewGame();
+                    currentScreen = SCREEN_GAME;
+                }
+                else if(hoverMedium){
+                    selectedDifficulty = DIFFICULTY_MEDIUM;
+                    startNewGame();
+                    currentScreen = SCREEN_GAME;
+                }
+                else if(hoverHard){
+                    selectedDifficulty = DIFFICULTY_HARD;
+                    startNewGame();
+                    currentScreen = SCREEN_GAME;
+                }
+                else if(hoverBack){
+                    currentScreen = SCREEN_MENU;
+                }
             }
         }
         else if (currentScreen == SCREEN_GAME){
@@ -447,6 +551,31 @@ int main(void) {
             int leaderboardTextWidth = MeasureText(leaderboardBtnText, 20);
             DrawText(leaderboardBtnText,(int)leaderboardBtn.x + ((int)leaderboardBtn.width-leaderboardTextWidth)/2,(int)leaderboardBtn.y + 15,20, WHITE);
         }
+        // Difficulty selection screen rendering
+        else if(currentScreen == SCREEN_DIFFICULTY){
+
+            const char *title = "SELECT DIFFICULTY";
+            DrawText(title,(screenWidth - MeasureText(title, 30))/2,130, 30, DARKBLUE);
+
+            // Easy button
+            DrawRectangleRec(easyBtn, GREEN);
+            DrawText("EASY", 370, 245, 20, WHITE);
+
+            // Medium button
+            DrawRectangleRec(mediumBtn, BLUE);
+            DrawText("MEDIUM", 360, 315, 20, WHITE);
+
+            // Hard button
+            DrawRectangleRec(hardBtn, RED);
+            DrawText("HARD", 370, 385, 20, WHITE);
+
+            // Back button
+            DrawRectangleRec(difficultyBackBtn, GRAY);
+            DrawText("BACK TO MENU", 335, 472, 16, WHITE);
+            DrawText("Easy: 4-5 letters",320, 205, 16, DARKGRAY);
+            DrawText("Medium: 6-8 letters",320, 275, 16, DARKGRAY);
+            DrawText("Hard: 9+ letters",320, 345, 16, DARKGRAY);
+        }
         //Leaderboard screen rendering
         else if(currentScreen == SCREEN_LEADERBOARD){
             const char *leaderboardTitle = "PLAYER LEADERBOARD";
@@ -487,6 +616,11 @@ int main(void) {
         else if(currentScreen == SCREEN_GAME){
             const char *gameTitle = "HANGMAN GAMEPLAY";
             DrawText(gameTitle, (screenWidth-MeasureText(gameTitle,28))/2,50,28,DARKBLUE);
+            const char *difficultyName =
+                (selectedDifficulty == DIFFICULTY_EASY) ? "EASY" :
+                (selectedDifficulty == DIFFICULTY_MEDIUM) ? "MEDIUM" : "HARD";
+
+            DrawText(TextFormat("Difficulty: %s", difficultyName),30, 100, 18, DARKBLUE);
 
             //Display secret word with space padding (e.g. "_ _ A _ _")
             char formattedWord[100] = "";
