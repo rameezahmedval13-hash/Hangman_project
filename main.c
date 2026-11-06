@@ -17,6 +17,8 @@
 #include "raylib.h"
 #include "backend.h"
 #include <string.h>
+#include <stdlib.h>
+#include <stdint.h>
 
 //enum datatype to manage screen state transitions
 typedef enum {
@@ -60,6 +62,38 @@ void DrawHangman(int strikes){
 
 }//end function
 
+//Generate sound effects in memory [DATE: 11/06/2026][MODIFIED BY: MUHAMMAD USAID]
+Sound GenerateTone(int frequency, float duration, float volume){
+
+    Wave wave = {0};
+
+    wave.frameCount = (unsigned int)(44100 * duration);
+    wave.sampleRate = 44100;
+    wave.sampleSize = 16;
+    wave.channels = 1;
+
+    short *samples = malloc(wave.frameCount * sizeof(short));
+
+    if(samples == NULL){
+        return (Sound){0};
+    }
+
+    int samplesPerCycle = 44100 / frequency;
+    for(unsigned int i = 0; i < wave.frameCount; i++){
+        int amplitude = (int)(volume * 12000);
+        if(i > wave.frameCount * 0.8f){
+            amplitude = (int)(amplitude * (wave.frameCount - i) /
+                       (wave.frameCount * 0.2f));
+        }
+        samples[i] = ((i / samplesPerCycle) % 2 == 0)
+                     ? (short)amplitude : (short)-amplitude;
+    }//endfor
+    wave.data = samples;
+    Sound generatedSound = LoadSoundFromWave(wave);
+    free(samples);
+    return generatedSound;
+}//end function
+
 //reset board state and fetch a fresh word from backend [DATE: 10/20/2026][MODIFIED BY: Rameez Ahmed]
 void startNewGame(void){
     if(!getRandomWord(secretWord)){
@@ -94,6 +128,13 @@ int main(void) {
     //creating display window with dimensions and title
     InitWindow(screenWidth, screenHeight, "Hangman Game");
     SetTargetFPS(60); //capping rendering speed to 60 FPS
+
+    //Initialize audio and generate game sounds [DATE: 11/06/2026][MODIFIED BY: MUHAMMAD USAID]
+    InitAudioDevice();
+    Sound correctSound = GenerateTone(750, 0.12f, 0.5f);
+    Sound wrongSound   = GenerateTone(180, 0.20f, 0.5f);
+    Sound winSound     = GenerateTone(1000, 0.35f, 0.5f);
+    Sound loseSound    = GenerateTone(120, 0.40f, 0.5f);
 
     //Track active application screen: default authentication portal
     GameScreen currentScreen = SCREEN_AUTH;
@@ -294,10 +335,19 @@ int main(void) {
                                 if(wrongAttempts >= maxAttempts){
                                     gameOver = true;
                                     gameWon = false;
-                                }//endif
-                            }else if(strcmp(secretWord, displayWord) == 0){
+                                    PlaySound(loseSound);
+                                }
+                                else{
+                                    PlaySound(wrongSound);
+                                }
+                            }
+                            else if(strcmp(secretWord, displayWord) == 0){
                                 gameOver = true;
                                 gameWon = true;
+                                PlaySound(winSound);
+                            }
+                            else{
+                                PlaySound(correctSound);
                             }
                         }//endif
                     }//endif
@@ -497,6 +547,13 @@ int main(void) {
         EndDrawing();
     }
     
+    //Unload audio resources [DATE: 11/06/2026][MODIFIED BY: MUHAMMAD USAID]
+    UnloadSound(correctSound);
+    UnloadSound(wrongSound);
+    UnloadSound(winSound);
+    UnloadSound(loseSound);
+    CloseAudioDevice();
+
     //clean up window memory before program termination
     CloseWindow();
     return 0;
