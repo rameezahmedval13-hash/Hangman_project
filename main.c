@@ -8,9 +8,10 @@
  *   2. Muhammad Usaid  (26K-2500
  * 
  * FILE: main.c
+  * LAST MODIFIED BY: Rameez Ahmed, Muhammad Usaid
  * DESCRIPTION: Main entry point and GUI interface using Raylib. Handles window
- *              rendering, user input, screen navigation state machine, and 
- *              bridges the front-end with backend data persistence.
+ *              rendering, user input, screen navigation, and player statistics
+ *              updates through backend data persistence.
  *=============================================================================*/
 
 #include "raylib.h"
@@ -21,7 +22,8 @@
 typedef enum {
     SCREEN_AUTH = 0,
     SCREEN_MENU,
-    SCREEN_GAME
+    SCREEN_GAME,
+    SCREEN_LEADERBOARD
 } GameScreen;
 
 //Game state variables
@@ -32,6 +34,31 @@ int wrongAttempts = 0;
 const int maxAttempts = 6;
 bool gameOver = false;
 bool gameWon = false;
+
+//Player stats update tracking [DATE: 11/05/2026 MODIFIED BY: MUHAMMAD USAID]
+bool statsUpdated = false;
+
+//function definition [DATE: 11/06/2026][MODIFIED BY: MUHAMMAD USAID]
+void DrawHangman(int strikes){
+
+    int baseX = 520;
+    int baseY = 150;
+
+    //Drawing gallows
+    DrawLine(baseX, baseY + 300, baseX + 150, baseY + 300, DARKBROWN);
+    DrawLine(baseX + 75, baseY + 300, baseX + 75, baseY, DARKBROWN);
+    DrawLine(baseX + 75, baseY, baseX + 200, baseY, DARKBROWN);
+    DrawLine(baseX + 200, baseY, baseX + 200, baseY + 30, BROWN);
+
+    //Drawing hangman based on wrong attempts
+    if(strikes >= 1) DrawCircle(baseX + 200, baseY + 50, 20, BLACK);
+    if(strikes >= 2) DrawLine(baseX + 200, baseY + 70, baseX + 200, baseY + 150, BLACK);
+    if(strikes >= 3) DrawLine(baseX + 200, baseY + 90, baseX + 160, baseY + 130, BLACK);
+    if(strikes >= 4) DrawLine(baseX + 200, baseY + 90, baseX + 240, baseY + 130, BLACK);
+    if(strikes >= 5) DrawLine(baseX + 200, baseY + 150, baseX + 170, baseY + 220, BLACK);
+    if(strikes >= 6) DrawLine(baseX + 200, baseY + 150, baseX + 230, baseY + 220, BLACK);
+
+}//end function
 
 //reset board state and fetch a fresh word from backend [DATE: 10/20/2026][MODIFIED BY: Rameez Ahmed]
 void startNewGame(void){
@@ -52,6 +79,9 @@ void startNewGame(void){
     wrongAttempts = 0;
     gameOver = false;
     gameWon = false;
+
+    //Reset stats update flag for new game [DATE: 11/05/2026][MODIFIED BY: MUHAMMAD USAID]
+    statsUpdated = false;
 
 }//end function
 
@@ -84,13 +114,19 @@ int main(void) {
     //active loggin in player  profile struct
     Player loggedInPlayer = {0};
 
+    //Leaderboard data [DATE: 11/06/2026][MODIFIED BY: MUHAMMAD USAID]
+    Player leaderboard[1000];
+    int leaderboardCount = 0;
+
     //defining boxes for UI 
     Rectangle usernameBox = { 300, 200, 250, 40 };
     Rectangle passwordBox = { 300, 260, 250, 40 };
     Rectangle loginBtn    = { 300, 330, 115, 45 };
     Rectangle registerBtn = { 435, 330, 115, 45 };
     Rectangle playBtn = {310,290,180,50};
+    Rectangle leaderboardBtn = {310,355,180,50};
     Rectangle backBtn = {310,480,180,40};
+    Rectangle leaderboardBackBtn = {310,480,180,40};
     
     //main application loop
     while (!WindowShouldClose()) {
@@ -203,13 +239,22 @@ int main(void) {
         }//endif
         else if(currentScreen == SCREEN_MENU){
             bool isHoverPlay = CheckCollisionPointRec(mousePoint, playBtn);
+            bool isHoverLeaderboard = CheckCollisionPointRec(mousePoint, leaderboardBtn);
             if(isHoverPlay){
                 SetMouseCursor(MOUSE_CURSOR_POINTING_HAND);
                 if(IsMouseButtonPressed(MOUSE_BUTTON_LEFT)){
                     startNewGame();
                     currentScreen = SCREEN_GAME;
                 }
-            }else{
+            }
+            else if(isHoverLeaderboard){
+                SetMouseCursor(MOUSE_CURSOR_POINTING_HAND);
+                if(IsMouseButtonPressed(MOUSE_BUTTON_LEFT)){
+                    leaderboardCount = getLeaderboard(leaderboard, 1000);
+                    currentScreen = SCREEN_LEADERBOARD;
+                }
+            }
+            else{
                 SetMouseCursor(MOUSE_CURSOR_DEFAULT);
             }
         }
@@ -265,6 +310,20 @@ int main(void) {
                 }//endif
             }//endif
         }//endif
+        
+        //Leaderboard screen input handling
+        else if(currentScreen == SCREEN_LEADERBOARD){
+            bool isHoverBack = CheckCollisionPointRec(mousePoint, leaderboardBackBtn);
+            if(isHoverBack){
+                SetMouseCursor(MOUSE_CURSOR_POINTING_HAND);
+                if(IsMouseButtonPressed(MOUSE_BUTTON_LEFT)){
+                    currentScreen = SCREEN_MENU;
+                }
+            }
+            else{
+                SetMouseCursor(MOUSE_CURSOR_DEFAULT);
+            }
+        }
 
         //----BEGIN DRAWING FRAME BUFFER-----
         BeginDrawing();
@@ -324,7 +383,7 @@ int main(void) {
             DrawText(statsStr,(screenWidth-MeasureText(statsStr, 20))/2,260,20,GRAY);
             
             const char *exitHint = "Press ESC to exit application";
-            DrawText(exitHint, (screenWidth-MeasureText(exitHint,18))/2, 400, 18, LIGHTGRAY);
+            DrawText(exitHint, (screenWidth-MeasureText(exitHint,18))/2, 440, 18, LIGHTGRAY);
 
             //Play game action button
             DrawRectangleRec(playBtn, DARKBLUE);
@@ -332,6 +391,47 @@ int main(void) {
             int btnTextWidth = MeasureText(btnText,20);
             DrawText(btnText, (int)playBtn.x + ((int)playBtn.width-btnTextWidth)/2, (int)playBtn.y + 15,20,WHITE);
 
+            //Leaderboard action button
+            DrawRectangleRec(leaderboardBtn, DARKBLUE);
+            const char *leaderboardBtnText = "LEADERBOARD";
+            int leaderboardTextWidth = MeasureText(leaderboardBtnText, 20);
+            DrawText(leaderboardBtnText,(int)leaderboardBtn.x + ((int)leaderboardBtn.width-leaderboardTextWidth)/2,(int)leaderboardBtn.y + 15,20, WHITE);
+        }
+        //Leaderboard screen rendering
+        else if(currentScreen == SCREEN_LEADERBOARD){
+            const char *leaderboardTitle = "PLAYER LEADERBOARD";
+            DrawText(leaderboardTitle,(screenWidth - MeasureText(leaderboardTitle, 30))/2,90, 30, DARKBLUE);
+            DrawText("TOP 5 PLAYERS BY SCORE",(screenWidth - MeasureText("TOP 5 PLAYERS BY SCORE", 18))/2,145, 18, GRAY);
+
+            //Leaderboard column headings
+            DrawText("RANK", 120, 190, 18, DARKGRAY);
+            DrawText("PLAYER", 210, 190, 18, DARKGRAY);
+            DrawText("SCORE", 450, 190, 18, DARKGRAY);
+            DrawText("WINS", 560, 190, 18, DARKGRAY);
+            DrawText("LOSSES", 660, 190, 18, DARKGRAY);
+
+            if(leaderboardCount == 0){
+                const char *emptyMsg = "No player records found.";
+                DrawText(emptyMsg,(screenWidth - MeasureText(emptyMsg, 20))/2,270, 20, GRAY);
+            }
+            else{
+                //Displaying top five players
+                int displayCount = (leaderboardCount < 5) ? leaderboardCount : 5;
+                for(int i = 0; i < displayCount; i++){
+                    int rowY = 230 + (i * 45);
+                    DrawText(TextFormat("%d", i + 1),130, rowY, 20, BLACK);
+                    DrawText(TextFormat("%.14s", leaderboard[i].username),210, rowY, 20, BLACK);
+                    DrawText(TextFormat("%d", leaderboard[i].score),450, rowY, 20, BLACK);
+                    DrawText(TextFormat("%d", leaderboard[i].wins),560, rowY, 20, BLACK);
+                    DrawText(TextFormat("%d", leaderboard[i].losses),670, rowY, 20, BLACK);
+                }//endfor
+            }//endif
+
+            //Back to Menu Button
+            DrawRectangleRec(leaderboardBackBtn, GRAY);
+            const char *backText = "BACK TO MENU";
+            int backTextWidth = MeasureText(backText, 16);
+            DrawText(backText,(int)leaderboardBackBtn.x + ((int)leaderboardBackBtn.width - backTextWidth)/2,(int)leaderboardBackBtn.y + 12,16, WHITE);
         }
         //Gameplay screen rendering
         else if(currentScreen == SCREEN_GAME){
@@ -350,6 +450,9 @@ int main(void) {
             //Attempts counter
             const char *attemptsStr = TextFormat("Wrong Attempts: %d / %d", wrongAttempts, maxAttempts);
             DrawText(attemptsStr, (screenWidth-MeasureText(attemptsStr,20))/2,230,20,(wrongAttempts >=4)?RED:DARKGRAY);
+
+            //Drawing hangman according to wrong attempts
+            DrawHangman(wrongAttempts);
 
             //Display Guessed Keyboard Letters
             char guessedStr[100] = "Guessed: ";
@@ -379,6 +482,16 @@ int main(void) {
             const char *backText = "BACK TO MENU";
             int backTextWidth = MeasureText(backText,16);
             DrawText(backText, (int)backBtn.x + ((int)backBtn.width-backTextWidth)/2, (int)backBtn.y + 12,16,WHITE);
+
+            //Updating player stats after game completion [DATE: 11/05/2026][MODIFIED BY: MUHAMMAD USAID]
+            if(gameOver && !statsUpdated){
+
+                if(!updatePlayerStats(&loggedInPlayer, gameWon)){
+                    TraceLog(LOG_ERROR, "Failed to save player stats!");
+                }//endif
+               statsUpdated = true;
+
+            }//endif
         }
         //output rendered frame to screen
         EndDrawing();

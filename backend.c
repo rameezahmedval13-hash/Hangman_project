@@ -8,9 +8,10 @@
  *   2. Muhammad Usaid  (26k-2500)
  * 
  * FILE: backend.c
- * LAST MODIFIED BY: Rameez Ahmed
+ * LAST MODIFIED BY: Rameez Ahmed, Muhammad Usaid
  * DESCRIPTION: Handles file read/write operations for user registration,
- *              login validation, and persistence across players.txt and scores.txt.
+ *              login validation, player statistics updates, and persistence
+ *              across players.txt and scores.txt.
  *=============================================================================*/
 
 
@@ -105,6 +106,154 @@ int loginUser(const char *username, const char *password, Player *player){
     }//endif
 
     return 1;
+}//end function
+
+//function definition [DATE: 11/05/2026][MODIFIED BY: MUHAMMAD USAID]
+int updatePlayerStats(Player *player, int won){
+
+    if(player == NULL){
+        return 0; //Invalid pointer
+    }//endif
+
+    //Opening scores file to fetch existing player records
+    FILE *sFile = fopen("scores.txt", "r");
+
+    if(sFile == NULL){
+        return 0; //File read error
+    }//endif
+
+    Player records[1000];
+    int count = 0;
+    int playerIndex = -1;
+
+    char username[50];
+    int tg, w, l, s;
+
+    //Reading all existing player records
+    while(fscanf(sFile, "%49s %d %d %d %d",
+                 username, &tg, &w, &l, &s) == 5){
+
+        if(count >= 1000){
+            fclose(sFile);
+            return 0; //Record limit reached
+        }//endif
+
+        strcpy(records[count].username, username);
+        records[count].total_games = tg;
+        records[count].wins = w;
+        records[count].losses = l;
+        records[count].score = s;
+
+        //Finding active player and updating stats
+        if(strcmp(username, player->username) == 0){
+
+            playerIndex = count;
+            records[count].total_games++;
+
+            if(won){
+                records[count].wins++;
+                records[count].score += 100;
+            }else{
+                records[count].losses++;
+            }//endif
+
+        }//endif
+
+        count++;
+
+    }//endwhile
+
+    fclose(sFile);
+
+    if(playerIndex == -1){
+        return 0; //Player not found
+    }//endif
+
+    //Opening scores file to save updated records
+    sFile = fopen("scores.txt", "w");
+
+    if(sFile == NULL){
+        return 0; //File write error
+    }//endif
+
+    //Writing all player records back to file
+    for(int i = 0; i < count; i++){
+
+        fprintf(sFile, "%s %d %d %d %d\n",
+                records[i].username,
+                records[i].total_games,
+                records[i].wins,
+                records[i].losses,
+                records[i].score);
+
+    }//endfor
+
+    fclose(sFile);
+
+    //Updating active player profile in memory
+    player->total_games = records[playerIndex].total_games;
+    player->wins = records[playerIndex].wins;
+    player->losses = records[playerIndex].losses;
+    player->score = records[playerIndex].score;
+
+    return 1; //Success
+
+}//end function
+
+//function definition [DATE: 11/06/2026][MODIFIED BY: MUHAMMAD USAID]
+int getLeaderboard(Player players[], int maxPlayers){
+
+    if(players == NULL || maxPlayers <= 0){
+        return 0;
+    }//endif
+
+    //Opening scores file to fetch player records
+    FILE *sFile = fopen("scores.txt", "r");
+
+    if(sFile == NULL){
+        return 0; //File read error
+    }//endif
+
+    int count = 0;
+    char username[50];
+    int tg, w, l, s;
+
+    //Reading player records from scores file
+    while(count < maxPlayers &&
+          fscanf(sFile, "%49s %d %d %d %d",
+                 username, &tg, &w, &l, &s) == 5){
+
+        strcpy(players[count].username, username);
+        players[count].total_games = tg;
+        players[count].wins = w;
+        players[count].losses = l;
+        players[count].score = s;
+
+        count++;
+
+    }//endwhile
+
+    fclose(sFile);
+
+    //Sorting players by score in descending order
+    for(int i = 0; i < count - 1; i++){
+
+        for(int j = 0; j < count - i - 1; j++){
+
+            if(players[j].score < players[j + 1].score){
+
+                Player temp = players[j];
+                players[j] = players[j + 1];
+                players[j + 1] = temp;
+
+            }//endif
+
+        }//endfor
+
+    }//endfor
+
+    return count;
+
 }//end function
 
 //function definition [DATE: 10/20/2026][MODIFIED BY: RAMEEZ AHMED]
