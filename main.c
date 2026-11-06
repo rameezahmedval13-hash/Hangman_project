@@ -37,6 +37,28 @@ bool gameWon = false;
 //Player stats update tracking [DATE: 11/05/2026 MODIFIED BY: MUHAMMAD USAID]
 bool statsUpdated = false;
 
+//function definition [DATE: 11/06/2026][MODIFIED BY: MUHAMMAD USAID]
+void DrawHangman(int strikes){
+
+    int baseX = 520;
+    int baseY = 150;
+
+    //Drawing gallows
+    DrawLine(baseX, baseY + 300, baseX + 150, baseY + 300, DARKBROWN);
+    DrawLine(baseX + 75, baseY + 300, baseX + 75, baseY, DARKBROWN);
+    DrawLine(baseX + 75, baseY, baseX + 200, baseY, DARKBROWN);
+    DrawLine(baseX + 200, baseY, baseX + 200, baseY + 30, BROWN);
+
+    //Drawing hangman based on wrong attempts
+    if(strikes >= 1) DrawCircle(baseX + 200, baseY + 50, 20, BLACK);
+    if(strikes >= 2) DrawLine(baseX + 200, baseY + 70, baseX + 200, baseY + 150, BLACK);
+    if(strikes >= 3) DrawLine(baseX + 200, baseY + 90, baseX + 160, baseY + 130, BLACK);
+    if(strikes >= 4) DrawLine(baseX + 200, baseY + 90, baseX + 240, baseY + 130, BLACK);
+    if(strikes >= 5) DrawLine(baseX + 200, baseY + 150, baseX + 170, baseY + 220, BLACK);
+    if(strikes >= 6) DrawLine(baseX + 200, baseY + 150, baseX + 230, baseY + 220, BLACK);
+
+}//end function
+
 //reset board state and fetch a fresh word from backend [DATE: 10/20/2026][MODIFIED BY: Rameez Ahmed]
 void startNewGame(void){
     if(!getRandomWord(secretWord)){
@@ -357,6 +379,9 @@ int main(void) {
             //Attempts counter
             const char *attemptsStr = TextFormat("Wrong Attempts: %d / %d", wrongAttempts, maxAttempts);
             DrawText(attemptsStr, (screenWidth-MeasureText(attemptsStr,20))/2,230,20,(wrongAttempts >=4)?RED:DARKGRAY);
+
+            //Drawing hangman according to wrong attempts
+            DrawHangman(wrongAttempts);
 
             //Display Guessed Keyboard Letters
             char guessedStr[100] = "Guessed: ";
