@@ -36,4 +36,7 @@ int getRandomWord(char *outWord);
 //Player Stats Prototype [DATE: 11/05/2026][MODIFIED BY: MUHAMMAD USAID]
 int updatePlayerStats(Player *player, int won);
 
+//Leaderboard Prototype [DATE: 11/06/2026][MODIFIED BY: MUHAMMAD USAID]
+int getLeaderboard(Player players[], int maxPlayers);
+
 #endif  //end of #ifndef

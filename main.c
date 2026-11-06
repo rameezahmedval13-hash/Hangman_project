@@ -22,7 +22,8 @@
 typedef enum {
     SCREEN_AUTH = 0,
     SCREEN_MENU,
-    SCREEN_GAME
+    SCREEN_GAME,
+    SCREEN_LEADERBOARD
 } GameScreen;
 
 //Game state variables
@@ -113,13 +114,19 @@ int main(void) {
     //active loggin in player  profile struct
     Player loggedInPlayer = {0};
 
+    //Leaderboard data [DATE: 11/06/2026][MODIFIED BY: MUHAMMAD USAID]
+    Player leaderboard[1000];
+    int leaderboardCount = 0;
+
     //defining boxes for UI 
     Rectangle usernameBox = { 300, 200, 250, 40 };
     Rectangle passwordBox = { 300, 260, 250, 40 };
     Rectangle loginBtn    = { 300, 330, 115, 45 };
     Rectangle registerBtn = { 435, 330, 115, 45 };
     Rectangle playBtn = {310,290,180,50};
+    Rectangle leaderboardBtn = {310,355,180,50};
     Rectangle backBtn = {310,480,180,40};
+    Rectangle leaderboardBackBtn = {310,480,180,40};
     
     //main application loop
     while (!WindowShouldClose()) {
@@ -232,13 +239,22 @@ int main(void) {
         }//endif
         else if(currentScreen == SCREEN_MENU){
             bool isHoverPlay = CheckCollisionPointRec(mousePoint, playBtn);
+            bool isHoverLeaderboard = CheckCollisionPointRec(mousePoint, leaderboardBtn);
             if(isHoverPlay){
                 SetMouseCursor(MOUSE_CURSOR_POINTING_HAND);
                 if(IsMouseButtonPressed(MOUSE_BUTTON_LEFT)){
                     startNewGame();
                     currentScreen = SCREEN_GAME;
                 }
-            }else{
+            }
+            else if(isHoverLeaderboard){
+                SetMouseCursor(MOUSE_CURSOR_POINTING_HAND);
+                if(IsMouseButtonPressed(MOUSE_BUTTON_LEFT)){
+                    leaderboardCount = getLeaderboard(leaderboard, 1000);
+                    currentScreen = SCREEN_LEADERBOARD;
+                }
+            }
+            else{
                 SetMouseCursor(MOUSE_CURSOR_DEFAULT);
             }
         }
@@ -294,6 +310,20 @@ int main(void) {
                 }//endif
             }//endif
         }//endif
+        
+        //Leaderboard screen input handling
+        else if(currentScreen == SCREEN_LEADERBOARD){
+            bool isHoverBack = CheckCollisionPointRec(mousePoint, leaderboardBackBtn);
+            if(isHoverBack){
+                SetMouseCursor(MOUSE_CURSOR_POINTING_HAND);
+                if(IsMouseButtonPressed(MOUSE_BUTTON_LEFT)){
+                    currentScreen = SCREEN_MENU;
+                }
+            }
+            else{
+                SetMouseCursor(MOUSE_CURSOR_DEFAULT);
+            }
+        }
 
         //----BEGIN DRAWING FRAME BUFFER-----
         BeginDrawing();
@@ -353,7 +383,7 @@ int main(void) {
             DrawText(statsStr,(screenWidth-MeasureText(statsStr, 20))/2,260,20,GRAY);
             
             const char *exitHint = "Press ESC to exit application";
-            DrawText(exitHint, (screenWidth-MeasureText(exitHint,18))/2, 400, 18, LIGHTGRAY);
+            DrawText(exitHint, (screenWidth-MeasureText(exitHint,18))/2, 440, 18, LIGHTGRAY);
 
             //Play game action button
             DrawRectangleRec(playBtn, DARKBLUE);
@@ -361,6 +391,47 @@ int main(void) {
             int btnTextWidth = MeasureText(btnText,20);
             DrawText(btnText, (int)playBtn.x + ((int)playBtn.width-btnTextWidth)/2, (int)playBtn.y + 15,20,WHITE);
 
+            //Leaderboard action button
+            DrawRectangleRec(leaderboardBtn, DARKBLUE);
+            const char *leaderboardBtnText = "LEADERBOARD";
+            int leaderboardTextWidth = MeasureText(leaderboardBtnText, 20);
+            DrawText(leaderboardBtnText,(int)leaderboardBtn.x + ((int)leaderboardBtn.width-leaderboardTextWidth)/2,(int)leaderboardBtn.y + 15,20, WHITE);
+        }
+        //Leaderboard screen rendering
+        else if(currentScreen == SCREEN_LEADERBOARD){
+            const char *leaderboardTitle = "PLAYER LEADERBOARD";
+            DrawText(leaderboardTitle,(screenWidth - MeasureText(leaderboardTitle, 30))/2,90, 30, DARKBLUE);
+            DrawText("TOP 5 PLAYERS BY SCORE",(screenWidth - MeasureText("TOP 5 PLAYERS BY SCORE", 18))/2,145, 18, GRAY);
+
+            //Leaderboard column headings
+            DrawText("RANK", 120, 190, 18, DARKGRAY);
+            DrawText("PLAYER", 210, 190, 18, DARKGRAY);
+            DrawText("SCORE", 450, 190, 18, DARKGRAY);
+            DrawText("WINS", 560, 190, 18, DARKGRAY);
+            DrawText("LOSSES", 660, 190, 18, DARKGRAY);
+
+            if(leaderboardCount == 0){
+                const char *emptyMsg = "No player records found.";
+                DrawText(emptyMsg,(screenWidth - MeasureText(emptyMsg, 20))/2,270, 20, GRAY);
+            }
+            else{
+                //Displaying top five players
+                int displayCount = (leaderboardCount < 5) ? leaderboardCount : 5;
+                for(int i = 0; i < displayCount; i++){
+                    int rowY = 230 + (i * 45);
+                    DrawText(TextFormat("%d", i + 1),130, rowY, 20, BLACK);
+                    DrawText(TextFormat("%.14s", leaderboard[i].username),210, rowY, 20, BLACK);
+                    DrawText(TextFormat("%d", leaderboard[i].score),450, rowY, 20, BLACK);
+                    DrawText(TextFormat("%d", leaderboard[i].wins),560, rowY, 20, BLACK);
+                    DrawText(TextFormat("%d", leaderboard[i].losses),670, rowY, 20, BLACK);
+                }//endfor
+            }//endif
+
+            //Back to Menu Button
+            DrawRectangleRec(leaderboardBackBtn, GRAY);
+            const char *backText = "BACK TO MENU";
+            int backTextWidth = MeasureText(backText, 16);
+            DrawText(backText,(int)leaderboardBackBtn.x + ((int)leaderboardBackBtn.width - backTextWidth)/2,(int)leaderboardBackBtn.y + 12,16, WHITE);
         }
         //Gameplay screen rendering
         else if(currentScreen == SCREEN_GAME){

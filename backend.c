@@ -200,6 +200,62 @@ int updatePlayerStats(Player *player, int won){
 
 }//end function
 
+//function definition [DATE: 11/06/2026][MODIFIED BY: MUHAMMAD USAID]
+int getLeaderboard(Player players[], int maxPlayers){
+
+    if(players == NULL || maxPlayers <= 0){
+        return 0;
+    }//endif
+
+    //Opening scores file to fetch player records
+    FILE *sFile = fopen("scores.txt", "r");
+
+    if(sFile == NULL){
+        return 0; //File read error
+    }//endif
+
+    int count = 0;
+    char username[50];
+    int tg, w, l, s;
+
+    //Reading player records from scores file
+    while(count < maxPlayers &&
+          fscanf(sFile, "%49s %d %d %d %d",
+                 username, &tg, &w, &l, &s) == 5){
+
+        strcpy(players[count].username, username);
+        players[count].total_games = tg;
+        players[count].wins = w;
+        players[count].losses = l;
+        players[count].score = s;
+
+        count++;
+
+    }//endwhile
+
+    fclose(sFile);
+
+    //Sorting players by score in descending order
+    for(int i = 0; i < count - 1; i++){
+
+        for(int j = 0; j < count - i - 1; j++){
+
+            if(players[j].score < players[j + 1].score){
+
+                Player temp = players[j];
+                players[j] = players[j + 1];
+                players[j + 1] = temp;
+
+            }//endif
+
+        }//endfor
+
+    }//endfor
+
+    return count;
+
+}//end function
+
 //function definition [DATE: 10/20/2026][MODIFIED BY: RAMEEZ AHMED]
 int getRandomWord(char *outWord){
     if(outWord == NULL){
