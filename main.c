@@ -8,9 +8,10 @@
  *   2. Muhammad Usaid  (26K-2500
  * 
  * FILE: main.c
+  * LAST MODIFIED BY: Rameez Ahmed, Muhammad Usaid
  * DESCRIPTION: Main entry point and GUI interface using Raylib. Handles window
- *              rendering, user input, screen navigation state machine, and 
- *              bridges the front-end with backend data persistence.
+ *              rendering, user input, screen navigation, and player statistics
+ *              updates through backend data persistence.
  *=============================================================================*/
 
 #include "raylib.h"
@@ -33,6 +34,9 @@ const int maxAttempts = 6;
 bool gameOver = false;
 bool gameWon = false;
 
+//Player stats update tracking [DATE: 11/05/2026 MODIFIED BY: MUHAMMAD USAID]
+bool statsUpdated = false;
+
 //reset board state and fetch a fresh word from backend [DATE: 10/20/2026][MODIFIED BY: Rameez Ahmed]
 void startNewGame(void){
     if(!getRandomWord(secretWord)){
@@ -52,6 +56,9 @@ void startNewGame(void){
     wrongAttempts = 0;
     gameOver = false;
     gameWon = false;
+
+    //Reset stats update flag for new game [DATE: 11/05/2026][MODIFIED BY: MUHAMMAD USAID]
+    statsUpdated = false;
 
 }//end function
 
@@ -379,6 +386,16 @@ int main(void) {
             const char *backText = "BACK TO MENU";
             int backTextWidth = MeasureText(backText,16);
             DrawText(backText, (int)backBtn.x + ((int)backBtn.width-backTextWidth)/2, (int)backBtn.y + 12,16,WHITE);
+
+            //Updating player stats after game completion [DATE: 11/05/2026][MODIFIED BY: MUHAMMAD USAID]
+            if(gameOver && !statsUpdated){
+
+                if(!updatePlayerStats(&loggedInPlayer, gameWon)){
+                    TraceLog(LOG_ERROR, "Failed to save player stats!");
+                }//endif
+               statsUpdated = true;
+
+            }//endif
         }
         //output rendered frame to screen
         EndDrawing();
