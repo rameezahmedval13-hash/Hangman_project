@@ -61,6 +61,10 @@ bool gameWon = false;
 //Player stats update tracking [DATE: 11/05/2026 MODIFIED BY: MUHAMMAD USAID]
 bool statsUpdated = false;
 
+// Hint balance for the currently logged in player
+int availableHints = 3;
+long long nextHintRecharge = 0;
+
 //function definition [DATE: 11/06/2026][MODIFIED BY: MUHAMMAD USAID]
 void DrawHangman(int strikes){
 
@@ -194,6 +198,100 @@ void startNewGame(void){
 
 }//end function
 
+// Save and update each player's hint balance in hints.txt
+typedef struct {
+    char username[50];
+    int remainingHints;
+    long long nextRechargeTime;
+} HintRecord;
+
+int processHintData(const char *username, int consumeHint,int *balanceOut, long long *nextRechargeOut){
+    HintRecord records[1000];
+    int recordCount = 0;
+    int playerIndex = -1;
+
+    FILE *file = fopen("hints.txt", "r");
+
+    if(file != NULL){
+        char line[128];
+        while(fgets(line, sizeof(line), file) != NULL){
+            HintRecord record;
+            if(sscanf(line, "%49s %d %lld", record.username,&record.remainingHints, &record.nextRechargeTime) == 3){
+                if(record.remainingHints < 0) record.remainingHints = 0;
+                if(record.remainingHints > 3) record.remainingHints = 3;
+                if(record.remainingHints == 3){
+                    record.nextRechargeTime = 0;
+                }
+                if(recordCount < 1000){
+                    records[recordCount] = record;
+                    if(strcmp(record.username, username) == 0){
+                        playerIndex = recordCount;
+                    }
+                    recordCount++;
+                }
+            }
+        }
+        fclose(file);
+    }
+
+    // A new player starts with three hints.
+    if(playerIndex == -1){
+        if(recordCount >= 1000) return 0;
+        playerIndex = recordCount;
+        strcpy(records[playerIndex].username, username);
+        records[playerIndex].remainingHints = 3;
+        records[playerIndex].nextRechargeTime = 0;
+        recordCount++;
+    }
+
+    HintRecord *playerRecord = &records[playerIndex];
+    long long currentTime = (long long)time(NULL);
+    const long long rechargeInterval = 8LL * 60LL * 60LL;
+
+    // Recharge one hint for every completed eight-hour interval.
+    if(playerRecord->remainingHints < 3){
+        if(playerRecord->nextRechargeTime <= 0){
+            playerRecord->nextRechargeTime = currentTime + rechargeInterval;
+        }
+        else if(currentTime >= playerRecord->nextRechargeTime){
+            long long gained = 1 +
+                (currentTime - playerRecord->nextRechargeTime) / rechargeInterval;
+            playerRecord->remainingHints += (int)gained;
+            if(playerRecord->remainingHints >= 3){
+                playerRecord->remainingHints = 3;
+                playerRecord->nextRechargeTime = 0;
+            }
+            else{
+                playerRecord->nextRechargeTime += gained * rechargeInterval;
+            }
+        }
+    }
+
+    // Consume only one hint when available.
+    if(consumeHint && playerRecord->remainingHints > 0){
+        playerRecord->remainingHints--;
+        if(playerRecord->remainingHints < 3 &&
+           playerRecord->nextRechargeTime <= 0){
+            playerRecord->nextRechargeTime = currentTime + rechargeInterval;
+        }
+    }
+
+    // Save all players' records.
+    file = fopen("hints.txt", "w");
+    if(file == NULL) return 0;
+
+    for(int i = 0; i < recordCount; i++){
+        if(fprintf(file, "%s %d %lld\n", records[i].username,records[i].remainingHints,records[i].nextRechargeTime) < 0){
+            fclose(file);
+            return 0;
+        }
+    }
+    fclose(file);
+    *balanceOut = playerRecord->remainingHints;
+    *nextRechargeOut = playerRecord->nextRechargeTime;
+    
+    return 1;
+}
 
 int main(void) {
     //window initialization
@@ -243,6 +341,7 @@ int main(void) {
     Rectangle playBtn = {310,290,180,50};
     Rectangle leaderboardBtn = {310,355,180,50};
     Rectangle backBtn = {310,480,180,40};
+    Rectangle hintBtn = {30,405,140,40};
     Rectangle leaderboardBackBtn = {310,480,180,40};
 
     // Difficulty selection buttons
@@ -302,9 +401,15 @@ int main(void) {
                         strcpy(authStatusMsg,"Please fill in all fields!");
                         authStatusColor = RED;
                     }else if(loginUser(usernameBuf,passwordBuf, &loggedInPlayer)){
-                        strcpy(authStatusMsg,"Login Successful!");
-                        authStatusColor = GREEN;
-                        currentScreen = SCREEN_MENU;
+                        if(processHintData(loggedInPlayer.username, 0,&availableHints, &nextHintRecharge)){
+                            strcpy(authStatusMsg,"Login Successful!");
+                            authStatusColor = GREEN;
+                            currentScreen = SCREEN_MENU;
+                        }
+                        else{
+                            strcpy(authStatusMsg,"Could not load hints data.");
+                            authStatusColor = RED;
+                        }
                     }else{
                         strcpy(authStatusMsg,"Invalid username or password.");
                         authStatusColor = RED;
@@ -448,14 +553,82 @@ int main(void) {
             }
         }
         else if (currentScreen == SCREEN_GAME){
-            bool isHoverBack = CheckCollisionPointRec(mousePoint,backBtn);
-            if(isHoverBack){
-                SetMouseCursor(MOUSE_CURSOR_POINTING_HAND);
-                if(IsMouseButtonPressed(MOUSE_BUTTON_LEFT)){
-                    currentScreen = SCREEN_MENU;
+
+            // Refresh hints when recharge time is completed.
+            if(availableHints < 3 && nextHintRecharge > 0 &&(long long)time(NULL) >= nextHintRecharge){
+                if(!processHintData(loggedInPlayer.username, 0,&availableHints, &nextHintRecharge)){
+                    TraceLog(LOG_ERROR, "Failed to refresh hint data!");
                 }
-            }else{
+            }
+            bool isHoverBack = CheckCollisionPointRec(mousePoint, backBtn);
+            bool isHoverHint = CheckCollisionPointRec(mousePoint, hintBtn);
+
+            if(isHoverBack || isHoverHint){
+                SetMouseCursor(MOUSE_CURSOR_POINTING_HAND);
+            }
+            else{
                 SetMouseCursor(MOUSE_CURSOR_DEFAULT);
+            }
+
+            // Back button
+            if(isHoverBack && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)){
+
+    currentScreen = SCREEN_MENU;
+            }
+
+            // Hint button
+            else if(isHoverHint && IsMouseButtonPressed(MOUSE_BUTTON_LEFT) &&
+        !gameOver && availableHints > 0){
+
+    int hiddenPositions[50];
+    int hiddenCount = 0;
+    int wordLength = strlen(secretWord);
+
+    // Find all hidden letter positions.
+    for(int i = 0; i < wordLength; i++){
+
+        if(displayWord[i] == '_'){
+            hiddenPositions[hiddenCount] = i;
+            hiddenCount++;
+        }
+    }
+
+    if(hiddenCount > 0){
+
+        if(processHintData(loggedInPlayer.username, 1,
+                           &availableHints, &nextHintRecharge)){
+
+            // Randomly select one hidden position.
+            int chosenPosition = hiddenPositions[rand() % hiddenCount];
+
+            char hintLetter = secretWord[chosenPosition];
+
+            guessedLetters[hintLetter - 'A'] = true;
+
+            // Reveal all occurrences of that letter.
+            for(int i = 0; i < wordLength; i++){
+
+                if(secretWord[i] == hintLetter){
+                    displayWord[i] = hintLetter;
+                }
+            }
+
+            // Check if the word is completed.
+            if(strcmp(secretWord, displayWord) == 0){
+
+                gameOver = true;
+                gameWon = true;
+
+                PlaySound(winSound);
+            }
+            else{
+                PlaySound(correctSound);
+            }
+        }
+        else{
+            TraceLog(LOG_ERROR, "Failed to update hint data!");
+        }
+    }
             }
 
             //game input processing
@@ -692,6 +865,20 @@ int main(void) {
             //Attempts counter
             const char *attemptsStr = TextFormat("Wrong Attempts: %d / %d", wrongAttempts, maxAttempts);
             DrawText(attemptsStr, (screenWidth-MeasureText(attemptsStr,20))/2,230,20,(wrongAttempts >=4)?RED:DARKGRAY);
+
+            // Hint balance and recharge countdown
+            DrawText(TextFormat("Hints: %d/3", availableHints),30, 380, 18, DARKBLUE);
+            DrawRectangleRec(hintBtn,(!gameOver && availableHints > 0) ? BLUE : GRAY);
+            DrawText("USE HINT",(int)hintBtn.x + 30,(int)hintBtn.y + 12,16, WHITE);
+
+            // Display remaining recharge time.
+            if(availableHints < 3 && nextHintRecharge > 0){
+                long long secondsLeft = nextHintRecharge - (long long)time(NULL);
+                if(secondsLeft < 0) secondsLeft = 0;
+                int hoursLeft = (int)(secondsLeft / 3600);
+                int minutesLeft = (int)((secondsLeft % 3600) / 60);
+                DrawText(TextFormat("Next hint: %02d:%02d",hoursLeft, minutesLeft), 30, 455, 16, GRAY);
+            }
 
             // Display selected category
             // [DATE: 11/07/2026][MODIFIED BY: MUHAMMAD USAID]
