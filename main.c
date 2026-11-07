@@ -29,6 +29,7 @@ typedef enum {
     SCREEN_CATEGORY,
     SCREEN_DIFFICULTY,
     SCREEN_GAME,
+    SCREEN_PAUSE,
     SCREEN_LEADERBOARD
 } GameScreen;
 
@@ -300,6 +301,7 @@ int main(void) {
 
     //creating display window with dimensions and title
     InitWindow(screenWidth, screenHeight, "Hangman Game");
+    SetExitKey(KEY_NULL);
     SetTargetFPS(60); //capping rendering speed to 60 FPS
     srand((unsigned int)time(NULL));
 
@@ -312,6 +314,11 @@ int main(void) {
 
     //Track active application screen: default authentication portal
     GameScreen currentScreen = SCREEN_AUTH;
+    GameScreen previousScreen = SCREEN_AUTH;
+    bool quitRequested = false;
+    bool showQuitConfirmation = false;
+
+    bool showSwitchConfirmation = false;
 
     //text input buffers and char counters
     char usernameBuf[50] = "\0";
@@ -344,6 +351,15 @@ int main(void) {
     Rectangle hintBtn = {30,405,140,40};
     Rectangle leaderboardBackBtn = {310,480,180,40};
 
+    // Pause Menu and Account Switching buttons
+    Rectangle switchAccountBtn = {310, 420, 180, 45};
+    Rectangle pauseResumeBtn = {310, 245, 180, 45};
+    Rectangle pauseSwitchBtn = {310, 310, 180, 45};
+    Rectangle pauseMenuBtn = {310, 375, 180, 45};
+    Rectangle pauseQuitBtn = {310, 440, 180, 45};
+    Rectangle confirmYesBtn = {240, 330, 140, 42};
+    Rectangle confirmNoBtn = {420, 330, 140, 42};
+
     // Difficulty selection buttons
     Rectangle easyBtn = {310, 230, 180, 50};
     Rectangle mediumBtn = {310, 300, 180, 50};
@@ -362,9 +378,33 @@ int main(void) {
     Rectangle categoryBackBtn = {310, 490, 180, 40};
 
     //main application loop
-    while (!WindowShouldClose()) {
+    while (!WindowShouldClose() && !quitRequested) {
         //tracking real time mouse position
         Vector2 mousePoint = GetMousePosition();
+
+        // ESC key handling
+        if(IsKeyPressed(KEY_ESCAPE)){
+            if(currentScreen == SCREEN_MENU){
+                quitRequested = true;
+            }
+            else if(currentScreen == SCREEN_PAUSE){
+                if(showSwitchConfirmation){
+                    showSwitchConfirmation = false;
+                }
+                else if(showQuitConfirmation){
+                    showQuitConfirmation = false;
+                }
+                else{
+                    currentScreen = previousScreen;
+                }
+            }
+            else{
+                previousScreen = currentScreen;
+                currentScreen = SCREEN_PAUSE;
+                showSwitchConfirmation = false;
+                showQuitConfirmation = false;
+            }
+        }
 
         if (currentScreen == SCREEN_AUTH){
             //collision detection flags
@@ -479,6 +519,7 @@ int main(void) {
         else if(currentScreen == SCREEN_MENU){
             bool isHoverPlay = CheckCollisionPointRec(mousePoint, playBtn);
             bool isHoverLeaderboard = CheckCollisionPointRec(mousePoint, leaderboardBtn);
+            bool isHoverSwitch = CheckCollisionPointRec(mousePoint, switchAccountBtn);
             if(isHoverPlay){
                 SetMouseCursor(MOUSE_CURSOR_POINTING_HAND);
                 if(IsMouseButtonPressed(MOUSE_BUTTON_LEFT)){
@@ -490,6 +531,19 @@ int main(void) {
                 if(IsMouseButtonPressed(MOUSE_BUTTON_LEFT)){
                     leaderboardCount = getLeaderboard(leaderboard, 1000);
                     currentScreen = SCREEN_LEADERBOARD;
+                }
+            }
+            else if(isHoverSwitch){
+                SetMouseCursor(MOUSE_CURSOR_POINTING_HAND);
+                if(IsMouseButtonPressed(MOUSE_BUTTON_LEFT)){
+                    usernameBuf[0] = '\0';
+                    passwordBuf[0] = '\0';
+                    usernameLetterCount = 0;
+                    passwordLetterCount = 0;
+                    activeField = 0;
+                    authStatusMsg[0] = '\0';
+                    memset(&loggedInPlayer, 0, sizeof(loggedInPlayer));
+                    currentScreen = SCREEN_AUTH;
                 }
             }
             else{
@@ -681,7 +735,80 @@ int main(void) {
                 }//endif
             }//endif
         }//endif
-        
+
+        // Pause Menu input handling
+        else if(currentScreen == SCREEN_PAUSE){
+            if(gameOver && !statsUpdated){
+                if(!updatePlayerStats(&loggedInPlayer, gameWon)){
+                    TraceLog(LOG_ERROR, "Failed to save player stats!");
+                }
+                statsUpdated = true;
+            }
+            bool hoverResume = CheckCollisionPointRec(mousePoint, pauseResumeBtn);
+            bool hoverSwitch = CheckCollisionPointRec(mousePoint, pauseSwitchBtn);
+            bool hoverMenu = CheckCollisionPointRec(mousePoint, pauseMenuBtn);
+            bool hoverQuit = CheckCollisionPointRec(mousePoint, pauseQuitBtn);
+            bool hoverYes = CheckCollisionPointRec(mousePoint, confirmYesBtn);
+            bool hoverNo = CheckCollisionPointRec(mousePoint, confirmNoBtn);
+
+            if(showSwitchConfirmation || showQuitConfirmation){
+                SetMouseCursor((hoverYes || hoverNo) ?MOUSE_CURSOR_POINTING_HAND :MOUSE_CURSOR_DEFAULT);
+                if(IsMouseButtonPressed(MOUSE_BUTTON_LEFT)){
+                    if(hoverYes){
+                        if(showSwitchConfirmation){
+                            usernameBuf[0] = '\0';
+                            passwordBuf[0] = '\0';
+                            usernameLetterCount = 0;
+                            passwordLetterCount = 0;
+                            activeField = 0;
+                            authStatusMsg[0] = '\0';
+                            authStatusColor = RED;
+                            memset(&loggedInPlayer, 0, sizeof(loggedInPlayer));
+                            secretWord[0] = '\0';
+                            displayWord[0] = '\0';
+
+                            for(int i = 0; i < 26; i++){
+                                guessedLetters[i] = false;
+                            }
+                            wrongAttempts = 0;
+                            gameOver = false;
+                            gameWon = false;
+                            statsUpdated = false;
+                            availableHints = 3;
+                            nextHintRecharge = 0;
+                            showSwitchConfirmation = false;
+                            currentScreen = SCREEN_AUTH;
+                        }
+                        else if(showQuitConfirmation){
+                            quitRequested = true;
+                        }
+                    }
+                    else if(hoverNo){
+                        showSwitchConfirmation = false;
+                        showQuitConfirmation = false;
+                    }
+                }
+            }
+            else{
+                SetMouseCursor((hoverResume || hoverSwitch ||hoverMenu || hoverQuit) ?MOUSE_CURSOR_POINTING_HAND :MOUSE_CURSOR_DEFAULT);
+
+                if(IsMouseButtonPressed(MOUSE_BUTTON_LEFT)){
+                    if(hoverResume){
+                        currentScreen = previousScreen;
+                    }
+                    else if(hoverSwitch){
+                        showSwitchConfirmation = true;
+                    }
+                    else if(hoverMenu){
+                        currentScreen = SCREEN_MENU;
+                    }
+                    else if(hoverQuit){
+                        showQuitConfirmation = true;
+                    }
+                }
+            }
+        }
+
         //Leaderboard screen input handling
         else if(currentScreen == SCREEN_LEADERBOARD){
             bool isHoverBack = CheckCollisionPointRec(mousePoint, leaderboardBackBtn);
@@ -754,7 +881,7 @@ int main(void) {
             DrawText(statsStr,(screenWidth-MeasureText(statsStr, 20))/2,260,20,GRAY);
             
             const char *exitHint = "Press ESC to exit application";
-            DrawText(exitHint, (screenWidth-MeasureText(exitHint,18))/2, 440, 18, LIGHTGRAY);
+            DrawText(exitHint, (screenWidth-MeasureText(exitHint,18))/2, 510, 18, LIGHTGRAY);
 
             //Play game action button
             DrawRectangleRec(playBtn, DARKBLUE);
@@ -767,6 +894,12 @@ int main(void) {
             const char *leaderboardBtnText = "LEADERBOARD";
             int leaderboardTextWidth = MeasureText(leaderboardBtnText, 20);
             DrawText(leaderboardBtnText,(int)leaderboardBtn.x + ((int)leaderboardBtn.width-leaderboardTextWidth)/2,(int)leaderboardBtn.y + 15,20, WHITE);
+
+            // Switch Account button
+            DrawRectangleRec(switchAccountBtn, DARKGRAY);
+            const char *switchText = "SWITCH ACCOUNT";
+            int switchTextWidth = MeasureText(switchText, 16);
+            DrawText(switchText,(int)switchAccountBtn.x +((int)switchAccountBtn.width - switchTextWidth)/2,(int)switchAccountBtn.y + 14,16, WHITE);
         }
 
         // Category selection screen rendering
@@ -843,6 +976,78 @@ int main(void) {
             int backTextWidth = MeasureText(backText, 16);
             DrawText(backText,(int)leaderboardBackBtn.x + ((int)leaderboardBackBtn.width - backTextWidth)/2,(int)leaderboardBackBtn.y + 12,16, WHITE);
         }
+
+        // Pause Menu rendering
+        else if(currentScreen == SCREEN_PAUSE){
+            const char *pauseTitle = "GAME PAUSED";
+            DrawText(pauseTitle,(screenWidth - MeasureText(pauseTitle, 32))/2,130, 32, DARKBLUE);
+            DrawText("Your game is safely paused.",(screenWidth - MeasureText("Your game is safely paused.", 18))/2,185, 18, GRAY);
+
+            // Resume button
+            DrawRectangleRec(pauseResumeBtn, DARKBLUE);
+            const char *resumeText = "RESUME";
+            DrawText(resumeText,(int)pauseResumeBtn.x +((int)pauseResumeBtn.width - MeasureText(resumeText, 18))/2,(int)pauseResumeBtn.y + 13,18, WHITE);
+
+            // Switch Account button
+            DrawRectangleRec(pauseSwitchBtn, DARKGRAY);
+            const char *pauseSwitchText = "SWITCH ACCOUNT";
+            DrawText(pauseSwitchText,(int)pauseSwitchBtn.x +((int)pauseSwitchBtn.width - MeasureText(pauseSwitchText, 16))/2,(int)pauseSwitchBtn.y + 14,16, WHITE);
+
+            // Main Menu button
+            DrawRectangleRec(pauseMenuBtn, GRAY);
+
+            const char *menuText = "MAIN MENU";
+            DrawText(menuText,(int)pauseMenuBtn.x +((int)pauseMenuBtn.width - MeasureText(menuText, 18))/2,(int)pauseMenuBtn.y + 13,18, WHITE);
+
+            // Quit Game button
+            DrawRectangleRec(pauseQuitBtn, RED);
+            const char *quitText = "QUIT GAME";
+            DrawText(quitText,(int)pauseQuitBtn.x +((int)pauseQuitBtn.width - MeasureText(quitText, 18))/2,(int)pauseQuitBtn.y + 13, 18, WHITE);
+
+            // Switch Account confirmation popup
+            if(showSwitchConfirmation){
+                DrawRectangle(0, 0, screenWidth, screenHeight,Fade(BLACK, 0.60f));
+                Rectangle dialogBox = {100, 190, 600, 230};
+                DrawRectangleRec(dialogBox, RAYWHITE);
+                DrawRectangleLinesEx(dialogBox, 2, DARKBLUE);
+                const char *dialogTitle = "SWITCH ACCOUNT?";
+                DrawText(dialogTitle,(screenWidth - MeasureText(dialogTitle, 24))/2,215, 24, DARKBLUE);
+                if(previousScreen == SCREEN_GAME && !gameOver){
+                    DrawText("You have an active game in progress.",(screenWidth - MeasureText("You have an active game in progress.", 17))/2,265, 17, DARKGRAY);
+                    DrawText("Switching accounts will forfeit this match.",(screenWidth - MeasureText("Switching accounts will forfeit this match.", 17))/2,290, 17, DARKGRAY);
+                    DrawText("Continue?",(screenWidth - MeasureText("Continue?", 17))/2,315, 17, DARKGRAY);
+                }
+                else{
+                    DrawText("Your completed game result has been saved.",(screenWidth - MeasureText("Your completed game result has been saved.", 17))/2,275, 17, DARKGRAY);
+                    DrawText("Continue switching accounts?",(screenWidth - MeasureText("Continue switching accounts?", 17))/2,305, 17, DARKGRAY);
+                }
+                // Yes button
+                DrawRectangleRec(confirmYesBtn, RED);
+                DrawText("YES, SWITCH",(int)confirmYesBtn.x +((int)confirmYesBtn.width -MeasureText("YES, SWITCH", 16))/2,(int)confirmYesBtn.y + 12,16, WHITE);
+
+                // No button
+                DrawRectangleRec(confirmNoBtn, DARKGRAY);
+                DrawText("CANCEL",(int)confirmNoBtn.x +((int)confirmNoBtn.width -MeasureText("CANCEL", 16))/2,(int)confirmNoBtn.y + 12,16, WHITE);
+            }
+            // Quit Game confirmation popup
+            if(showQuitConfirmation){
+                DrawRectangle(0, 0, screenWidth, screenHeight,Fade(BLACK, 0.60f));
+                Rectangle dialogBox = {100, 190, 600, 230};
+                DrawRectangleRec(dialogBox, RAYWHITE);
+                DrawRectangleLinesEx(dialogBox, 2, DARKBLUE);
+                
+                const char *dialogTitle = "QUIT GAME?";
+                DrawText(dialogTitle,(screenWidth - MeasureText(dialogTitle, 24))/2,230, 24, DARKBLUE);
+
+                const char *message = "Are you sure you want to exit?";
+                DrawText(message,(screenWidth - MeasureText(message, 18))/2,285, 18, DARKGRAY);
+                DrawRectangleRec(confirmYesBtn, RED);
+                DrawText("YES, QUIT",(int)confirmYesBtn.x +((int)confirmYesBtn.width - MeasureText("YES, QUIT", 16))/2,(int)confirmYesBtn.y + 12, 16, WHITE);
+                DrawRectangleRec(confirmNoBtn, DARKGRAY);
+                DrawText("CANCEL",(int)confirmNoBtn.x +((int)confirmNoBtn.width - MeasureText("CANCEL", 16))/2,(int)confirmNoBtn.y + 12, 16, WHITE);
+            }
+        }
+
         //Gameplay screen rendering
         else if(currentScreen == SCREEN_GAME){
             const char *gameTitle = "HANGMAN GAMEPLAY";
