@@ -26,6 +26,7 @@
 typedef enum {
     SCREEN_AUTH = 0,
     SCREEN_MENU,
+    SCREEN_CATEGORY,
     SCREEN_DIFFICULTY,
     SCREEN_GAME,
     SCREEN_LEADERBOARD
@@ -38,6 +39,14 @@ typedef enum {
     DIFFICULTY_HARD
 } Difficulty;
 
+// Category Selection [DATE: 11/07/2026][MODIFIED BY: MUHAMMAD USAID]
+const char *categoryNames[12] = {
+    "TECH", "MATH", "SCIENCE", "ANIMALS",
+    "NATURE", "GEOGRAPHY", "PLACES", "OBJECTS",
+    "PEOPLE", "JOBS", "SOCIETY", "ARTS"
+};
+
+int selectedCategory = 0;
 Difficulty selectedDifficulty = DIFFICULTY_MEDIUM;
 
 //Game state variables
@@ -74,10 +83,10 @@ void DrawHangman(int strikes){
 
 }//end function
 
-// Select a random word according to difficulty
-// [DATE: 11/06/2026][MODIFIED BY: MUHAMMAD USAID]
-int getWordByDifficulty(char *outWord, Difficulty difficulty){
-    if(outWord == NULL){
+// Select word by category and difficulty
+// [DATE: 11/07/2026][MODIFIED BY: MUHAMMAD USAID]
+int getWordByCategoryAndDifficulty(char *outWord,Difficulty difficulty,const char *category){
+    if(outWord == NULL || category == NULL){
         return 0;
     }
     int minLength, maxLength;
@@ -98,13 +107,14 @@ int getWordByDifficulty(char *outWord, Difficulty difficulty){
         return 0;
     }
     char word[50];
+    char wordCategory[20];
     char selectedWord[50];
     int count = 0;
-
-    // Reservoir sampling: randomly select one matching word
-    while(fscanf(file, "%49s", word) == 1){
+    
+    while(fscanf(file, "%49s %19s", word, wordCategory) == 2){
         int length = strlen(word);
-        if(length >= minLength && length <= maxLength){
+        if(strcmp(wordCategory, category) == 0 &&
+           length >= minLength && length <= maxLength){
             count++;
             if(rand() % count == 0){
                 strcpy(selectedWord, word);
@@ -153,7 +163,7 @@ Sound GenerateTone(int frequency, float duration, float volume){
 
 //reset board state and fetch a fresh word from backend [DATE: 10/20/2026][MODIFIED BY: Rameez Ahmed]
 void startNewGame(void){
-    if(!getWordByDifficulty(secretWord, selectedDifficulty)){
+    if(!getWordByCategoryAndDifficulty(secretWord,selectedDifficulty,categoryNames[selectedCategory])){
         if(selectedDifficulty == DIFFICULTY_EASY){
             strcpy(secretWord, "APPLE");
         }
@@ -240,7 +250,18 @@ int main(void) {
     Rectangle mediumBtn = {310, 300, 180, 50};
     Rectangle hardBtn = {310, 370, 180, 50};
     Rectangle difficultyBackBtn = {310, 460, 180, 40};
-    
+
+    // Category selection buttons
+    // [DATE: 11/07/2026][MODIFIED BY: MUHAMMAD USAID]
+    Rectangle categoryBtns[12];
+
+    for(int i = 0; i < 12; i++){
+        int col = i % 3;
+        int row = i / 3;
+        categoryBtns[i] = (Rectangle){100 + col * 210,170 + row * 75,180,50};
+    }
+    Rectangle categoryBackBtn = {310, 490, 180, 40};
+
     //main application loop
     while (!WindowShouldClose()) {
         //tracking real time mouse position
@@ -356,7 +377,7 @@ int main(void) {
             if(isHoverPlay){
                 SetMouseCursor(MOUSE_CURSOR_POINTING_HAND);
                 if(IsMouseButtonPressed(MOUSE_BUTTON_LEFT)){
-                    currentScreen = SCREEN_DIFFICULTY;
+                    currentScreen = SCREEN_CATEGORY;
                 }
             }
             else if(isHoverLeaderboard){
@@ -370,6 +391,29 @@ int main(void) {
                 SetMouseCursor(MOUSE_CURSOR_DEFAULT);
             }
         }
+
+        // Category selection screen input handling
+        else if(currentScreen == SCREEN_CATEGORY){
+            bool hoverCategory = false;
+            for(int i = 0; i < 12; i++){
+                if(CheckCollisionPointRec(mousePoint, categoryBtns[i])){
+                    hoverCategory = true;
+                    if(IsMouseButtonPressed(MOUSE_BUTTON_LEFT)){
+                        selectedCategory = i;
+                        currentScreen = SCREEN_DIFFICULTY;
+                    }
+                }
+            }
+            bool hoverBack = CheckCollisionPointRec(mousePoint, categoryBackBtn);
+            if(hoverBack){
+                hoverCategory = true;
+                if(IsMouseButtonPressed(MOUSE_BUTTON_LEFT)){
+                    currentScreen = SCREEN_MENU;
+                }
+            }
+            SetMouseCursor(hoverCategory ?MOUSE_CURSOR_POINTING_HAND : MOUSE_CURSOR_DEFAULT);
+        }
+
         // Difficulty selection screen input handling
         else if(currentScreen == SCREEN_DIFFICULTY){
             bool hoverEasy = CheckCollisionPointRec(mousePoint, easyBtn);
@@ -399,7 +443,7 @@ int main(void) {
                     currentScreen = SCREEN_GAME;
                 }
                 else if(hoverBack){
-                    currentScreen = SCREEN_MENU;
+                    currentScreen = SCREEN_CATEGORY;
                 }
             }
         }
@@ -551,6 +595,20 @@ int main(void) {
             int leaderboardTextWidth = MeasureText(leaderboardBtnText, 20);
             DrawText(leaderboardBtnText,(int)leaderboardBtn.x + ((int)leaderboardBtn.width-leaderboardTextWidth)/2,(int)leaderboardBtn.y + 15,20, WHITE);
         }
+
+        // Category selection screen rendering
+        else if(currentScreen == SCREEN_CATEGORY){
+            const char *title = "SELECT CATEGORY";
+            DrawText(title, (screenWidth - MeasureText(title, 30))/2,100, 30, DARKBLUE);
+            for(int i = 0; i < 12; i++){
+                DrawRectangleRec(categoryBtns[i], DARKBLUE);
+                int textWidth = MeasureText(categoryNames[i], 18);
+                DrawText(categoryNames[i],(int)categoryBtns[i].x +((int)categoryBtns[i].width - textWidth)/2,(int)categoryBtns[i].y + 15,18, WHITE);
+            }
+            DrawRectangleRec(categoryBackBtn, GRAY);
+            DrawText("BACK TO MENU", 335, 502, 16, WHITE);
+        }
+
         // Difficulty selection screen rendering
         else if(currentScreen == SCREEN_DIFFICULTY){
 
@@ -571,7 +629,7 @@ int main(void) {
 
             // Back button
             DrawRectangleRec(difficultyBackBtn, GRAY);
-            DrawText("BACK TO MENU", 335, 472, 16, WHITE);
+            DrawText("BACK TO CATEGORY", 325, 472, 16, WHITE);
             DrawText("Easy: 4-5 letters",320, 205, 16, DARKGRAY);
             DrawText("Medium: 6-8 letters",320, 275, 16, DARKGRAY);
             DrawText("Hard: 9+ letters",320, 345, 16, DARKGRAY);
@@ -634,6 +692,10 @@ int main(void) {
             //Attempts counter
             const char *attemptsStr = TextFormat("Wrong Attempts: %d / %d", wrongAttempts, maxAttempts);
             DrawText(attemptsStr, (screenWidth-MeasureText(attemptsStr,20))/2,230,20,(wrongAttempts >=4)?RED:DARKGRAY);
+
+            // Display selected category
+            // [DATE: 11/07/2026][MODIFIED BY: MUHAMMAD USAID]
+            DrawText(TextFormat("Category: %s", categoryNames[selectedCategory]),30, 125, 18, DARKBLUE);
 
             //Drawing hangman according to wrong attempts
             DrawHangman(wrongAttempts);
