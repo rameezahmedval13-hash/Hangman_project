@@ -2,16 +2,17 @@
  * PROJECT: File Based Hangman Game with Player Profiles & Score History
  * COURSE: Programming Fundamentals
  * SECTION: BDS-1A
- * 
+ *
  * GROUP MEMBERS:
- *   1. Rameez Ahmed    (26k-2527)
- *   2. Muhammad Usaid  (26k-2500)
- * 
+ *   1. Rameez Ahmed    (26K-2527)
+ *   2. Muhammad Usaid  (26K-2500)
+ *
  * FILE: backend.c
  * LAST MODIFIED BY: Rameez Ahmed, Muhammad Usaid
- * DESCRIPTION: Handles file read/write operations for user registration,
- *              login validation, player statistics updates, and persistence
- *              across players.txt and scores.txt.
+ * DESCRIPTION: Contains functions for player registration and login,
+ *              reading and saving account information, updating player
+ *              statistics, maintaining leaderboard records, and selecting
+ *              random words from the words file.
  *=============================================================================*/
 
 
@@ -287,5 +288,3 @@ int getRandomWord(char *outWord){
     strcpy(outWord, words[randomIndex]);
     return 1; //success
 }//endfunction
-
-

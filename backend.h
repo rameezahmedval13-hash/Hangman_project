@@ -2,16 +2,17 @@
  * PROJECT: File Based Hangman Game with Player Profiles & Score History
  * COURSE: Programming Fundamentals
  * SECTION: BDS-1A
- * 
+ *
  * GROUP MEMBERS:
- *   1. Rameez Ahmed    (26k-2527)
- *   2. Muhammad Usaid  (26k-2500)
- * 
+ *   1. Rameez Ahmed    (26K-2527)
+ *   2. Muhammad Usaid  (26K-2500)
+ *
  * FILE: backend.h
-  * LAST MODIFIED BY: Rameez Ahmed, Muhammad Usaid
- * DESCRIPTION: Declarations for player structure, authentication,
- *              player statistics updates, and word engine functions
- *              shared between backend.c and main.c.
+ * LAST MODIFIED BY: Rameez Ahmed, Muhammad Usaid
+ * DESCRIPTION: Contains the Player structure and function declarations
+ *              used by main.c and backend.c. Includes functions for
+ *              registration, login, random word selection, player
+ *              statistics updates, and leaderboard records.
  *=============================================================================*/
 
 #ifndef BACKEND_H
