@@ -1,17 +1,19 @@
 /*=============================================================================
- * PROJECT: Hangman Game
- * COURSE: Programming Fundamentals (LAB)
+ * PROJECT: File Based Hangman Game with Player Profiles & Score History
+ * COURSE: Programming Fundamentals
  * SECTION: BDS-1A
- * 
+ *
  * GROUP MEMBERS:
  *   1. Rameez Ahmed    (26K-2527)
- *   2. Muhammad Usaid  (26K-2500
- * 
+ *   2. Muhammad Usaid  (26K-2500)
+ *
  * FILE: main.c
-  * LAST MODIFIED BY: Rameez Ahmed, Muhammad Usaid
- * DESCRIPTION: Main entry point and GUI interface using Raylib. Handles window
- *              rendering, user input, screen navigation, and player statistics
- *              updates through backend data persistence.
+ * LAST MODIFIED BY: Rameez Ahmed, Muhammad Usaid
+ * DESCRIPTION: Main file of the Hangman game. Handles the Raylib window,
+ *              game screens, player input, and user interface. Includes
+ *              category and difficulty selection, Hangman gameplay, hints
+ *              with recharge system, sound effects, pause menu, account
+ *              switching, leaderboard, and player statistics display.
  *=============================================================================*/
 
 #include "raylib.h"
@@ -21,6 +23,12 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <time.h>
+
+// Custom Inter font
+Font gameFont;
+Font semiBoldFont;
+int gameFontLoaded = 0;
+int semiBoldFontLoaded = 0;
 
 //enum datatype to manage screen state transitions
 typedef enum {
@@ -294,13 +302,49 @@ int processHintData(const char *username, int consumeHint,int *balanceOut, long 
     return 1;
 }
 
+// Draw text using the custom Inter font
+void DrawGameText(const char *text, int posX, int posY,int fontSize, Color color){
+    DrawTextEx(gameFont,text,(Vector2){(float)posX, (float)posY},(float)fontSize,0.0f,color);
+}
+
+// Measure text using the custom Inter font
+int MeasureGameText(const char *text, int fontSize){
+    Vector2 textSize = MeasureTextEx(gameFont,text,(float)fontSize,0.0f);
+    return (int)textSize.x;
+}
+
+void DrawBoldText(const char *text, int posX, int posY,int fontSize, Color color){
+    DrawTextEx(semiBoldFont,text,(Vector2){(float)posX, (float)posY},(float)fontSize,0.0f,color);
+}
+
+// Redirect existing text calls to the custom font
+#define DrawText DrawGameText
+#define MeasureText MeasureGameText
+
 int main(void) {
     //window initialization
     const int screenWidth = 800;
     const int screenHeight = 600;
 
-    //creating display window with dimensions and title
     InitWindow(screenWidth, screenHeight, "Hangman Game");
+    // Load custom Inter fonts
+    if(FileExists("assets/fonts/Inter-Regular.ttf")){
+        gameFont = LoadFontEx("assets/fonts/Inter-Regular.ttf", 32, NULL, 0);
+        gameFontLoaded = 1;
+        SetTextureFilter(gameFont.texture, TEXTURE_FILTER_BILINEAR);
+    }
+    else{
+        gameFont = GetFontDefault();
+        TraceLog(LOG_WARNING, "Inter Regular font not found.");
+    }
+    if(FileExists("assets/fonts/Inter-SemiBold.ttf")){
+        semiBoldFont = LoadFontEx("assets/fonts/Inter-SemiBold.ttf", 48, NULL, 0);
+        semiBoldFontLoaded = 1;
+    }
+    else{
+        semiBoldFont = gameFont;
+        TraceLog(LOG_WARNING, "Inter SemiBold font not found.");
+    }
     SetExitKey(KEY_NULL);
     SetTargetFPS(60); //capping rendering speed to 60 FPS
     srand((unsigned int)time(NULL));
@@ -317,7 +361,6 @@ int main(void) {
     GameScreen previousScreen = SCREEN_AUTH;
     bool quitRequested = false;
     bool showQuitConfirmation = false;
-
     bool showSwitchConfirmation = false;
 
     //text input buffers and char counters
@@ -829,307 +872,490 @@ int main(void) {
 
         //authentication screen rendering
         if (currentScreen == SCREEN_AUTH) {
-            // main title and section header
+            Color pageBg = {245, 244, 239, 255};
+            Color panelBg = {255, 255, 252, 255};
+            Color navy = {36, 52, 71, 255};
+            Color teal = {70, 132, 125, 255};
+            Color mutedText = {112, 119, 122, 255};
+            Color border = {224, 224, 216, 255};
+
+            ClearBackground(pageBg);
+
+            // Main panel
+            Rectangle authPanel = {155, 70, 490, 415};
+            DrawRectangleRounded(authPanel, 0.035f, 8, panelBg);
+            DrawRectangleLinesEx(authPanel, 1.0f, border);
+
+            // Heading
             const char *title = "HANGMAN GAME";
-            DrawText(title, (screenWidth-MeasureText(title,34))/2, 80, 34, DARKBLUE);
+            DrawBoldText(title,(screenWidth - MeasureText(title, 34))/2,105, 34, navy);
             const char *subtitle = "Player Portal";
-            DrawText(subtitle, (screenWidth-MeasureText(subtitle,20))/2, 125, 20, GRAY);
+            DrawText(subtitle,(screenWidth - MeasureText(subtitle, 18))/2,150, 18, mutedText);
 
-            //Text input field labels
-            DrawText("Username:", 180, 210, 20, DARKGRAY);
-            DrawText("Password:", 180, 270, 20, DARKGRAY);
+            // Input labels
+            DrawText("Username", 180, 210, 19, navy);
+            DrawText("Password", 180, 270, 19, navy);
 
-            //Username input box container
-            DrawRectangleRec(usernameBox, LIGHTGRAY);
-            DrawRectangleLinesEx(usernameBox, (activeField == 1)? 3:1, (activeField == 1) ? BLUE : GRAY);
-            DrawText(usernameBuf, (int)usernameBox.x + 10, (int)usernameBox.y + 10, 20, BLACK);
-            //Password input box container
-            DrawRectangleRec(passwordBox, LIGHTGRAY);
-            DrawRectangleLinesEx(passwordBox, (activeField==2)?3:1, (activeField == 2)?BLUE:GRAY);
+            // Username field
+            DrawRectangleRec(usernameBox, WHITE);
+            DrawRectangleLinesEx(usernameBox,activeField == 1 ? 2.0f : 1.0f,activeField == 1 ? teal : border);
+            DrawText(usernameBuf,(int)usernameBox.x + 10,(int)usernameBox.y + 10,20, navy);
 
-            //masking password characters with *
+            // Password field
+            DrawRectangleRec(passwordBox, WHITE);
+            DrawRectangleLinesEx(passwordBox,activeField == 2 ? 2.0f : 1.0f,activeField == 2 ? teal : border);
+
+            // Mask password characters
             char maskedPass[50] = "\0";
-            for (int i = 0; i<passwordLetterCount; i++){
+            for (int i = 0; i < passwordLetterCount; i++) {
                 maskedPass[i] = '*';
-            }//endfor
+            }
+
             maskedPass[passwordLetterCount] = '\0';
-            DrawText(maskedPass, (int)passwordBox.x + 10, (int)passwordBox.y + 10, 20, BLACK);
+            DrawText(maskedPass,(int)passwordBox.x + 10,(int)passwordBox.y + 10,20, navy);
 
-            //Login action button
-            DrawRectangleRec(loginBtn, BLUE);
-            DrawText("LOGIN", (int)loginBtn.x + 28, (int)loginBtn.y + 12, 18, WHITE);
-            //Register action button
-            DrawRectangleRec(registerBtn, GREEN);
-            DrawText("REGISTER", (int)registerBtn.x + 12, (int)registerBtn.y + 12, 18, WHITE);
+            // Login button
+            bool hoverLogin =CheckCollisionPointRec(mousePoint, loginBtn);
+            DrawRectangleRounded(loginBtn, 0.12f, 8,hoverLogin ? (Color){55, 112, 106, 255} : teal);
+            const char *loginText = "LOGIN";
+            DrawBoldText(loginText,(int)loginBtn.x +((int)loginBtn.width - MeasureText(loginText, 18))/2,(int)loginBtn.y + 12,18, WHITE);
 
-            //On-screen feedback msg
-            if(strlen(authStatusMsg)> 0){
-                int msgWidth = MeasureText(authStatusMsg,18);
-                DrawText(authStatusMsg, (screenWidth-msgWidth)/2, 395, 18, authStatusColor);
+            // Register button
+            bool hoverRegister =CheckCollisionPointRec(mousePoint, registerBtn);
+            DrawRectangleRounded(registerBtn, 0.12f, 8,hoverRegister ? navy : (Color){55, 72, 89, 255});
+            const char *registerText = "REGISTER";
+            DrawBoldText(registerText,(int)registerBtn.x +((int)registerBtn.width - MeasureText(registerText, 18))/2,(int)registerBtn.y + 12,18, WHITE);
+
+            // Authentication feedback
+            if (strlen(authStatusMsg) > 0) {
+                int msgWidth = MeasureText(authStatusMsg, 18);
+                DrawText(authStatusMsg,(screenWidth - msgWidth)/2,395, 18, authStatusColor);
             }
         }
-        //Main menu rendering
+        
+        // Main Menu rendering
         else if(currentScreen == SCREEN_MENU){
-            //Main menu state - active player profile display 
-            const char *menuTitle = "MAIN MENU";
-            DrawText(menuTitle, (screenWidth-MeasureText(menuTitle,32))/2, 150,32, DARKBLUE);
 
-            const char *welcomeStr = TextFormat("Welcome, %s!", loggedInPlayer.username);
-            DrawText(welcomeStr,(screenWidth-MeasureText(welcomeStr, 22))/2,220,22,DARKGRAY);
-            
-            const char *statsStr = TextFormat("Wins: %d  |  Losses: %d  |  Score: %d",loggedInPlayer.wins,loggedInPlayer.losses,loggedInPlayer.score);
-            DrawText(statsStr,(screenWidth-MeasureText(statsStr, 20))/2,260,20,GRAY);
-            
-            const char *exitHint = "Press ESC to exit application";
-            DrawText(exitHint, (screenWidth-MeasureText(exitHint,18))/2, 510, 18, LIGHTGRAY);
+            // Theme colours
+            Color pageBg = { 245, 244, 239, 255 };
+            Color panelBg = { 255, 255, 252, 255 };
+            Color navy = { 36, 52, 71, 255 };
+            Color teal = { 70, 132, 125, 255 };
+            Color tealHover = { 55, 112, 106, 255 };
+            Color mutedText = { 112, 119, 122, 255 };
+            Color border = { 224, 224, 216, 255 };
 
-            //Play game action button
-            DrawRectangleRec(playBtn, DARKBLUE);
+            ClearBackground(pageBg);
+
+            // Main content panel
+            Rectangle menuPanel = { 155, 75, 490, 455 };
+            DrawRectangleRounded(menuPanel, 0.035f, 8, panelBg);
+            DrawRectangleRoundedLinesEx(menuPanel, 0.035f, 8, 1.0f, border);
+
+            // Small game identity heading
+            const char *brandText = "HANGMAN";
+            DrawBoldText(brandText,(screenWidth - MeasureText(brandText, 34))/2,115, 34, navy);
+            const char *subtitle = "A classic word guessing game";
+            DrawText(subtitle,(screenWidth - MeasureText(subtitle, 17))/2,160, 17, mutedText);
+
+            // Player welcome
+            const char *welcomeStr =TextFormat("Welcome, %s!", loggedInPlayer.username);
+            DrawBoldText(welcomeStr,(screenWidth - MeasureText(welcomeStr, 22))/2,215, 22, navy);
+
+            // Player statistics
+            const char *statsStr = TextFormat("WINS   %d       LOSSES   %d       SCORE   %d",loggedInPlayer.wins,loggedInPlayer.losses,loggedInPlayer.score);
+            DrawText(statsStr,(screenWidth - MeasureText(statsStr, 16))/2,253, 16, mutedText);
+
+            // Play button
+            bool hoverPlay = CheckCollisionPointRec(mousePoint, playBtn);
+            DrawRectangleRounded(playBtn, 0.12f, 8,hoverPlay ? tealHover : teal);
             const char *btnText = "PLAY GAME";
-            int btnTextWidth = MeasureText(btnText,20);
-            DrawText(btnText, (int)playBtn.x + ((int)playBtn.width-btnTextWidth)/2, (int)playBtn.y + 15,20,WHITE);
+            DrawBoldText(btnText,(int)playBtn.x +((int)playBtn.width - MeasureText(btnText, 19))/2,(int)playBtn.y + 15, 19, WHITE);
 
-            //Leaderboard action button
-            DrawRectangleRec(leaderboardBtn, DARKBLUE);
-            const char *leaderboardBtnText = "LEADERBOARD";
-            int leaderboardTextWidth = MeasureText(leaderboardBtnText, 20);
-            DrawText(leaderboardBtnText,(int)leaderboardBtn.x + ((int)leaderboardBtn.width-leaderboardTextWidth)/2,(int)leaderboardBtn.y + 15,20, WHITE);
+            // Leaderboard button
+            bool hoverLeaderboard =CheckCollisionPointRec(mousePoint, leaderboardBtn);
+            DrawRectangleRounded(leaderboardBtn, 0.12f, 8,hoverLeaderboard ? tealHover : teal);
+            const char *leaderboardText = "LEADERBOARD";
+            DrawBoldText(leaderboardText,(int)leaderboardBtn.x +((int)leaderboardBtn.width -MeasureText(leaderboardText, 18))/2,(int)leaderboardBtn.y + 15, 18, WHITE);
 
-            // Switch Account button
-            DrawRectangleRec(switchAccountBtn, DARKGRAY);
+            // Switch account button
+            bool hoverSwitch =CheckCollisionPointRec(mousePoint, switchAccountBtn);
+            DrawRectangleRounded(switchAccountBtn, 0.12f, 8,hoverSwitch ? border : pageBg);
+            DrawRectangleRoundedLinesEx(switchAccountBtn, 0.12f, 8, 1.0f, border);
             const char *switchText = "SWITCH ACCOUNT";
-            int switchTextWidth = MeasureText(switchText, 16);
-            DrawText(switchText,(int)switchAccountBtn.x +((int)switchAccountBtn.width - switchTextWidth)/2,(int)switchAccountBtn.y + 14,16, WHITE);
+            DrawBoldText(switchText,(int)switchAccountBtn.x +((int)switchAccountBtn.width -MeasureText(switchText, 16))/2,(int)switchAccountBtn.y + 14, 16, navy);
+
+            // Exit instruction
+            const char *exitHint = "Press ESC to exit";
+            DrawText(exitHint,(screenWidth - MeasureText(exitHint, 15))/2,555, 15, mutedText);
         }
 
-        // Category selection screen rendering
+
+        // Category Selection
         else if(currentScreen == SCREEN_CATEGORY){
+
+            Color pageBg = {245, 244, 239, 255};
+            Color panelBg = {255, 255, 252, 255};
+            Color navy = {36, 52, 71, 255};
+            Color teal = {70, 132, 125, 255};
+            Color tealHover = {55, 112, 106, 255};
+            Color mutedText = {112, 119, 122, 255};
+            Color border = {224, 224, 216, 255};
+
+            ClearBackground(pageBg);
+
+            // Main panel
+            Rectangle categoryPanel = {65, 65, 670, 485};
+
+            DrawRectangleRounded(categoryPanel, 0.025f, 8, panelBg);
+            DrawRectangleLinesEx(categoryPanel, 1.0f, border);
+
+            // Heading
             const char *title = "SELECT CATEGORY";
-            DrawText(title, (screenWidth - MeasureText(title, 30))/2,100, 30, DARKBLUE);
+            DrawBoldText(title,(screenWidth - MeasureText(title, 30))/2,100, 30, navy);
+            const char *subtitle = "Choose a topic to start playing";
+            DrawText(subtitle,(screenWidth - MeasureText(subtitle, 16))/2,140, 16, mutedText);
+
+            // Category buttons
             for(int i = 0; i < 12; i++){
-                DrawRectangleRec(categoryBtns[i], DARKBLUE);
+                bool hoverCategory =CheckCollisionPointRec(mousePoint, categoryBtns[i]);
+                DrawRectangleRounded(categoryBtns[i],0.10f,8,hoverCategory ? tealHover : navy);
                 int textWidth = MeasureText(categoryNames[i], 18);
-                DrawText(categoryNames[i],(int)categoryBtns[i].x +((int)categoryBtns[i].width - textWidth)/2,(int)categoryBtns[i].y + 15,18, WHITE);
+                DrawBoldText(categoryNames[i],(int)categoryBtns[i].x +((int)categoryBtns[i].width - textWidth)/2,(int)categoryBtns[i].y + 15,18,WHITE);
             }
-            DrawRectangleRec(categoryBackBtn, GRAY);
-            DrawText("BACK TO MENU", 335, 502, 16, WHITE);
-        }
-
-        // Difficulty selection screen rendering
-        else if(currentScreen == SCREEN_DIFFICULTY){
-
-            const char *title = "SELECT DIFFICULTY";
-            DrawText(title,(screenWidth - MeasureText(title, 30))/2,130, 30, DARKBLUE);
-
-            // Easy button
-            DrawRectangleRec(easyBtn, GREEN);
-            DrawText("EASY", 370, 245, 20, WHITE);
-
-            // Medium button
-            DrawRectangleRec(mediumBtn, BLUE);
-            DrawText("MEDIUM", 360, 315, 20, WHITE);
-
-            // Hard button
-            DrawRectangleRec(hardBtn, RED);
-            DrawText("HARD", 370, 385, 20, WHITE);
 
             // Back button
-            DrawRectangleRec(difficultyBackBtn, GRAY);
-            DrawText("BACK TO CATEGORY", 325, 472, 16, WHITE);
-            DrawText("Easy: 4-5 letters",320, 205, 16, DARKGRAY);
-            DrawText("Medium: 6-8 letters",320, 275, 16, DARKGRAY);
-            DrawText("Hard: 9+ letters",320, 345, 16, DARKGRAY);
+            bool hoverBack =CheckCollisionPointRec(mousePoint, categoryBackBtn);
+            DrawRectangleRounded(categoryBackBtn,0.10f,8,hoverBack ? border : pageBg);
+            DrawRectangleLinesEx(categoryBackBtn, 1.0f, border);
+            const char *backText = "BACK TO MENU";
+            DrawBoldText(backText,(int)categoryBackBtn.x +((int)categoryBackBtn.width - MeasureText(backText, 16))/2,(int)categoryBackBtn.y + 12,16, navy);
         }
+
+        
+        // Difficulty Selection 
+        else if(currentScreen == SCREEN_DIFFICULTY){
+
+            Color pageBg = {245, 244, 239, 255};
+            Color panelBg = {255, 255, 252, 255};
+            Color navy = {36, 52, 71, 255};
+            Color teal = {70, 132, 125, 255};
+            Color tealHover = {55, 112, 106, 255};
+            Color mutedText = {112, 119, 122, 255};
+            Color border = {224, 224, 216, 255};
+            ClearBackground(pageBg);
+
+            // Main panel
+            Rectangle difficultyPanel = {155, 65, 490, 485};
+            DrawRectangleRounded(difficultyPanel, 0.035f, 8, panelBg);
+            DrawRectangleLinesEx(difficultyPanel, 1.0f, border);
+
+            // Heading
+            const char *title = "SELECT DIFFICULTY";
+            DrawBoldText(title,(screenWidth - MeasureText(title, 30))/2,105, 30, navy);
+            const char *subtitle = "Choose your challenge level";
+            DrawText(subtitle,(screenWidth - MeasureText(subtitle, 16))/2,145, 16, mutedText);
+
+            // Easy option
+            bool hoverEasy = CheckCollisionPointRec(mousePoint, easyBtn);
+            DrawRectangleRounded(easyBtn, 0.10f, 8,hoverEasy ? tealHover : teal);
+            DrawBoldText("EASY",(int)easyBtn.x + ((int)easyBtn.width - MeasureText("EASY", 20))/2,(int)easyBtn.y + 15, 20, WHITE);
+
+            // Medium option
+            bool hoverMedium = CheckCollisionPointRec(mousePoint, mediumBtn);
+            DrawRectangleRounded(mediumBtn, 0.10f, 8,hoverMedium ? tealHover : navy);
+            DrawBoldText("MEDIUM",(int)mediumBtn.x + ((int)mediumBtn.width - MeasureText("MEDIUM", 20))/2,(int)mediumBtn.y + 15, 20, WHITE);
+
+            // Hard option 
+            bool hoverHard = CheckCollisionPointRec(mousePoint, hardBtn);
+            DrawRectangleRounded(hardBtn, 0.10f, 8,hoverHard ? tealHover : navy);
+            DrawBoldText("HARD",(int)hardBtn.x + ((int)hardBtn.width - MeasureText("HARD", 20))/2,(int)hardBtn.y + 15, 20, WHITE);
+
+            // Back button
+            bool hoverBack = CheckCollisionPointRec(mousePoint, difficultyBackBtn);
+            DrawRectangleRounded(difficultyBackBtn, 0.10f, 8,hoverBack ? border : pageBg);
+            DrawRectangleLinesEx(difficultyBackBtn, 1.0f, border);
+            const char *backText = "BACK TO CATEGORY";
+            DrawBoldText(backText,(int)difficultyBackBtn.x +((int)difficultyBackBtn.width - MeasureText(backText, 16))/2,(int)difficultyBackBtn.y + 12, 16, navy);
+        }
+
+
         //Leaderboard screen rendering
         else if(currentScreen == SCREEN_LEADERBOARD){
-            const char *leaderboardTitle = "PLAYER LEADERBOARD";
-            DrawText(leaderboardTitle,(screenWidth - MeasureText(leaderboardTitle, 30))/2,90, 30, DARKBLUE);
-            DrawText("TOP 5 PLAYERS BY SCORE",(screenWidth - MeasureText("TOP 5 PLAYERS BY SCORE", 18))/2,145, 18, GRAY);
+            Color pageBg = {245, 244, 239, 255};
+            Color panelBg = {255, 255, 252, 255};
+            Color navy = {36, 52, 71, 255};
+            Color teal = {70, 132, 125, 255};
+            Color mutedText = {112, 119, 122, 255};
+            Color border = {224, 224, 216, 255};
+            Color rowBg = {242, 244, 240, 255};
+            ClearBackground(pageBg);
 
-            //Leaderboard column headings
-            DrawText("RANK", 120, 190, 18, DARKGRAY);
-            DrawText("PLAYER", 210, 190, 18, DARKGRAY);
-            DrawText("SCORE", 450, 190, 18, DARKGRAY);
-            DrawText("WINS", 560, 190, 18, DARKGRAY);
-            DrawText("LOSSES", 660, 190, 18, DARKGRAY);
+            // Main panel
+            Rectangle leaderboardPanel = {55, 55, 690, 500};
+            DrawRectangleRounded(leaderboardPanel, 0.025f, 8, panelBg);
+            DrawRectangleLinesEx(leaderboardPanel, 1.0f, border);
+
+            // Heading
+            const char *leaderboardTitle = "PLAYER LEADERBOARD";
+            DrawBoldText(leaderboardTitle,(screenWidth - MeasureText(leaderboardTitle, 30))/2,90, 30, navy);
+            const char *subtitle = "TOP 5 PLAYERS BY SCORE";
+            DrawText(subtitle,(screenWidth - MeasureText(subtitle, 16))/2,135, 16, mutedText);
+            // Table header
+            DrawRectangleRounded((Rectangle){95, 180, 610, 42},0.08f, 8, navy);
+            DrawBoldText("RANK", 120, 193, 16, WHITE);
+            DrawBoldText("PLAYER", 220, 193, 16, WHITE);
+            DrawBoldText("SCORE", 465, 193, 16, WHITE);
+            DrawBoldText("WINS", 565, 193, 16, WHITE);
+            DrawBoldText("LOSSES", 650, 193, 16, WHITE);
 
             if(leaderboardCount == 0){
                 const char *emptyMsg = "No player records found.";
-                DrawText(emptyMsg,(screenWidth - MeasureText(emptyMsg, 20))/2,270, 20, GRAY);
+                DrawText(emptyMsg,(screenWidth - MeasureText(emptyMsg, 20))/2,285, 20, mutedText);
             }
             else{
-                //Displaying top five players
-                int displayCount = (leaderboardCount < 5) ? leaderboardCount : 5;
+                int displayCount = (leaderboardCount < 5)? leaderboardCount : 5;
                 for(int i = 0; i < displayCount; i++){
-                    int rowY = 230 + (i * 45);
-                    DrawText(TextFormat("%d", i + 1),130, rowY, 20, BLACK);
-                    DrawText(TextFormat("%.14s", leaderboard[i].username),210, rowY, 20, BLACK);
-                    DrawText(TextFormat("%d", leaderboard[i].score),450, rowY, 20, BLACK);
-                    DrawText(TextFormat("%d", leaderboard[i].wins),560, rowY, 20, BLACK);
-                    DrawText(TextFormat("%d", leaderboard[i].losses),670, rowY, 20, BLACK);
-                }//endfor
-            }//endif
-
-            //Back to Menu Button
-            DrawRectangleRec(leaderboardBackBtn, GRAY);
+                    int rowY = 235 + (i * 43);
+                    Rectangle row = {95, rowY - 5, 610, 36};
+                    DrawRectangleRounded(row, 0.06f, 8,(i == 0) ? (Color){225, 238, 232, 255} : rowBg);
+                    DrawBoldText(TextFormat("%d", i + 1),130, rowY + 3, 17, navy);
+                    DrawText(TextFormat("%.14s", leaderboard[i].username),220, rowY + 3, 17, navy);
+                    DrawText(TextFormat("%d", leaderboard[i].score),475, rowY + 3, 17, navy);
+                    DrawText(TextFormat("%d", leaderboard[i].wins),575, rowY + 3, 17, navy);
+                    DrawText(TextFormat("%d", leaderboard[i].losses),665, rowY + 3, 17, navy);
+                }
+            }
+            // Back button
+            bool hoverBack = CheckCollisionPointRec(mousePoint, leaderboardBackBtn);
+            DrawRectangleRounded(leaderboardBackBtn, 0.10f, 8,hoverBack ? (Color){55, 112, 106, 255} : teal);
             const char *backText = "BACK TO MENU";
-            int backTextWidth = MeasureText(backText, 16);
-            DrawText(backText,(int)leaderboardBackBtn.x + ((int)leaderboardBackBtn.width - backTextWidth)/2,(int)leaderboardBackBtn.y + 12,16, WHITE);
+            DrawBoldText(backText,(int)leaderboardBackBtn.x +((int)leaderboardBackBtn.width - MeasureText(backText, 16))/2,(int)leaderboardBackBtn.y + 12,16, WHITE);
         }
 
+        
         // Pause Menu rendering
         else if(currentScreen == SCREEN_PAUSE){
+            Color pageBg = {245, 244, 239, 255};
+            Color panelBg = {255, 255, 252, 255};
+            Color navy = {36, 52, 71, 255};
+            Color teal = {70, 132, 125, 255};
+            Color tealHover = {55, 112, 106, 255};
+            Color mutedText = {112, 119, 122, 255};
+            Color border = {224, 224, 216, 255};
+            Color lightButton = {242, 244, 240, 255};
+            Color danger = {174, 83, 78, 255};
+            Color dangerHover = {151, 65, 61, 255};
+            ClearBackground(pageBg);
+
+            // Main panel
+            Rectangle pausePanel = {100, 55, 600, 500};
+            DrawRectangleRounded(pausePanel, 0.025f, 8, panelBg);
+            DrawRectangleLinesEx(pausePanel, 1.0f, border);
+
+            // Heading
             const char *pauseTitle = "GAME PAUSED";
-            DrawText(pauseTitle,(screenWidth - MeasureText(pauseTitle, 32))/2,130, 32, DARKBLUE);
-            DrawText("Your game is safely paused.",(screenWidth - MeasureText("Your game is safely paused.", 18))/2,185, 18, GRAY);
+            DrawBoldText(pauseTitle,(screenWidth - MeasureText(pauseTitle, 32))/2,95, 32, navy);
+            const char *pauseSubtitle = "Take a break. Your game is safely paused.";
+            DrawText(pauseSubtitle,(screenWidth - MeasureText(pauseSubtitle, 16))/2,145, 16, mutedText);
+
+            // Button hover detection
+            bool hoverResume = CheckCollisionPointRec(mousePoint, pauseResumeBtn);
+            bool hoverSwitch = CheckCollisionPointRec(mousePoint, pauseSwitchBtn);
+            bool hoverMenu = CheckCollisionPointRec(mousePoint, pauseMenuBtn);
+            bool hoverQuit = CheckCollisionPointRec(mousePoint, pauseQuitBtn);
 
             // Resume button
-            DrawRectangleRec(pauseResumeBtn, DARKBLUE);
-            const char *resumeText = "RESUME";
-            DrawText(resumeText,(int)pauseResumeBtn.x +((int)pauseResumeBtn.width - MeasureText(resumeText, 18))/2,(int)pauseResumeBtn.y + 13,18, WHITE);
+            DrawRectangleRounded(pauseResumeBtn, 0.10f, 8,hoverResume ? tealHover : teal);
+            DrawBoldText("RESUME",(int)pauseResumeBtn.x +((int)pauseResumeBtn.width - MeasureText("RESUME", 18))/2,(int)pauseResumeBtn.y + 13, 18, WHITE);
 
             // Switch Account button
-            DrawRectangleRec(pauseSwitchBtn, DARKGRAY);
-            const char *pauseSwitchText = "SWITCH ACCOUNT";
-            DrawText(pauseSwitchText,(int)pauseSwitchBtn.x +((int)pauseSwitchBtn.width - MeasureText(pauseSwitchText, 16))/2,(int)pauseSwitchBtn.y + 14,16, WHITE);
+            DrawRectangleRounded(pauseSwitchBtn, 0.10f, 8,hoverSwitch ? border : lightButton);
+            DrawRectangleLinesEx(pauseSwitchBtn, 1.0f, border);
+            DrawBoldText("SWITCH ACCOUNT",(int)pauseSwitchBtn.x +((int)pauseSwitchBtn.width - MeasureText("SWITCH ACCOUNT", 16))/2,(int)pauseSwitchBtn.y + 14, 16, navy);
 
             // Main Menu button
-            DrawRectangleRec(pauseMenuBtn, GRAY);
-
-            const char *menuText = "MAIN MENU";
-            DrawText(menuText,(int)pauseMenuBtn.x +((int)pauseMenuBtn.width - MeasureText(menuText, 18))/2,(int)pauseMenuBtn.y + 13,18, WHITE);
+            DrawRectangleRounded(pauseMenuBtn, 0.10f, 8,hoverMenu ? border : lightButton);
+            DrawRectangleLinesEx(pauseMenuBtn, 1.0f, border);
+            DrawBoldText("MAIN MENU",(int)pauseMenuBtn.x +((int)pauseMenuBtn.width - MeasureText("MAIN MENU", 18))/2,(int)pauseMenuBtn.y + 13, 18, navy);
 
             // Quit Game button
-            DrawRectangleRec(pauseQuitBtn, RED);
-            const char *quitText = "QUIT GAME";
-            DrawText(quitText,(int)pauseQuitBtn.x +((int)pauseQuitBtn.width - MeasureText(quitText, 18))/2,(int)pauseQuitBtn.y + 13, 18, WHITE);
+            DrawRectangleRounded(pauseQuitBtn, 0.10f, 8,hoverQuit ? dangerHover : danger);
+            DrawBoldText("QUIT GAME",(int)pauseQuitBtn.x +((int)pauseQuitBtn.width - MeasureText("QUIT GAME", 18))/2,(int)pauseQuitBtn.y + 13, 18, WHITE);
 
             // Switch Account confirmation popup
             if(showSwitchConfirmation){
-                DrawRectangle(0, 0, screenWidth, screenHeight,Fade(BLACK, 0.60f));
+                DrawRectangle(0, 0, screenWidth, screenHeight,Fade(BLACK, 0.55f));
                 Rectangle dialogBox = {100, 190, 600, 230};
-                DrawRectangleRec(dialogBox, RAYWHITE);
-                DrawRectangleLinesEx(dialogBox, 2, DARKBLUE);
+                DrawRectangleRounded(dialogBox, 0.025f, 8, panelBg);
+                DrawRectangleLinesEx(dialogBox, 1.5f, border);
                 const char *dialogTitle = "SWITCH ACCOUNT?";
-                DrawText(dialogTitle,(screenWidth - MeasureText(dialogTitle, 24))/2,215, 24, DARKBLUE);
+                DrawBoldText(dialogTitle,(screenWidth - MeasureText(dialogTitle, 24))/2,215, 24, navy);
                 if(previousScreen == SCREEN_GAME && !gameOver){
-                    DrawText("You have an active game in progress.",(screenWidth - MeasureText("You have an active game in progress.", 17))/2,265, 17, DARKGRAY);
-                    DrawText("Switching accounts will forfeit this match.",(screenWidth - MeasureText("Switching accounts will forfeit this match.", 17))/2,290, 17, DARKGRAY);
-                    DrawText("Continue?",(screenWidth - MeasureText("Continue?", 17))/2,315, 17, DARKGRAY);
+                    const char *message1 = "You have an active game in progress.";
+                    const char *message2 = "Switching accounts will forfeit this match.";
+                    const char *message3 = "Continue?";
+                    DrawText(message1,(screenWidth - MeasureText(message1, 17))/2,265, 17, mutedText);
+                    DrawText(message2,(screenWidth - MeasureText(message2, 17))/2,290, 17, mutedText);
+                    DrawText(message3,(screenWidth - MeasureText(message3, 17))/2,315, 17, mutedText);
                 }
                 else{
-                    DrawText("Your completed game result has been saved.",(screenWidth - MeasureText("Your completed game result has been saved.", 17))/2,275, 17, DARKGRAY);
-                    DrawText("Continue switching accounts?",(screenWidth - MeasureText("Continue switching accounts?", 17))/2,305, 17, DARKGRAY);
-                }
-                // Yes button
-                DrawRectangleRec(confirmYesBtn, RED);
-                DrawText("YES, SWITCH",(int)confirmYesBtn.x +((int)confirmYesBtn.width -MeasureText("YES, SWITCH", 16))/2,(int)confirmYesBtn.y + 12,16, WHITE);
 
-                // No button
-                DrawRectangleRec(confirmNoBtn, DARKGRAY);
-                DrawText("CANCEL",(int)confirmNoBtn.x +((int)confirmNoBtn.width -MeasureText("CANCEL", 16))/2,(int)confirmNoBtn.y + 12,16, WHITE);
+                    const char *message1 = "Your completed game result has been saved.";
+                    const char *message2 = "Continue switching accounts?";
+                    DrawText(message1,(screenWidth - MeasureText(message1, 17))/2,275, 17, mutedText);
+                    DrawText(message2,(screenWidth - MeasureText(message2, 17))/2,305, 17, mutedText);
+                }
+
+                // Confirmation buttons
+                bool hoverYes = CheckCollisionPointRec(mousePoint, confirmYesBtn);
+                bool hoverNo = CheckCollisionPointRec(mousePoint, confirmNoBtn);
+                DrawRectangleRounded(confirmYesBtn, 0.10f, 8,hoverYes ? dangerHover : danger);
+                DrawBoldText("YES, SWITCH",(int)confirmYesBtn.x +((int)confirmYesBtn.width - MeasureText("YES, SWITCH", 16))/2,(int)confirmYesBtn.y + 12, 16, WHITE);
+                DrawRectangleRounded(confirmNoBtn, 0.10f, 8,hoverNo ? border : lightButton);
+                DrawRectangleLinesEx(confirmNoBtn, 1.0f, border);
+                DrawBoldText("CANCEL",(int)confirmNoBtn.x +((int)confirmNoBtn.width - MeasureText("CANCEL", 16))/2,(int)confirmNoBtn.y + 12, 16, navy);
             }
+
             // Quit Game confirmation popup
             if(showQuitConfirmation){
-                DrawRectangle(0, 0, screenWidth, screenHeight,Fade(BLACK, 0.60f));
+                DrawRectangle(0, 0, screenWidth, screenHeight,Fade(BLACK, 0.55f));
                 Rectangle dialogBox = {100, 190, 600, 230};
-                DrawRectangleRec(dialogBox, RAYWHITE);
-                DrawRectangleLinesEx(dialogBox, 2, DARKBLUE);
-                
+                DrawRectangleRounded(dialogBox, 0.025f, 8, panelBg);
+                DrawRectangleLinesEx(dialogBox, 1.5f, border);
                 const char *dialogTitle = "QUIT GAME?";
-                DrawText(dialogTitle,(screenWidth - MeasureText(dialogTitle, 24))/2,230, 24, DARKBLUE);
-
+                DrawBoldText(dialogTitle,(screenWidth - MeasureText(dialogTitle, 24))/2,230, 24, navy);
                 const char *message = "Are you sure you want to exit?";
-                DrawText(message,(screenWidth - MeasureText(message, 18))/2,285, 18, DARKGRAY);
-                DrawRectangleRec(confirmYesBtn, RED);
-                DrawText("YES, QUIT",(int)confirmYesBtn.x +((int)confirmYesBtn.width - MeasureText("YES, QUIT", 16))/2,(int)confirmYesBtn.y + 12, 16, WHITE);
-                DrawRectangleRec(confirmNoBtn, DARKGRAY);
-                DrawText("CANCEL",(int)confirmNoBtn.x +((int)confirmNoBtn.width - MeasureText("CANCEL", 16))/2,(int)confirmNoBtn.y + 12, 16, WHITE);
+                DrawText(message,(screenWidth - MeasureText(message, 18))/2,285, 18, mutedText);
+                bool hoverYes = CheckCollisionPointRec(mousePoint, confirmYesBtn);
+                bool hoverNo = CheckCollisionPointRec(mousePoint, confirmNoBtn);
+                DrawRectangleRounded(confirmYesBtn, 0.10f, 8,hoverYes ? dangerHover : danger);
+                DrawBoldText("YES, QUIT",(int)confirmYesBtn.x +((int)confirmYesBtn.width - MeasureText("YES, QUIT", 16))/2,(int)confirmYesBtn.y + 12, 16, WHITE);
+                DrawRectangleRounded(confirmNoBtn, 0.10f, 8,hoverNo ? border : lightButton);
+                DrawRectangleLinesEx(confirmNoBtn, 1.0f, border);
+                DrawBoldText("CANCEL",(int)confirmNoBtn.x +((int)confirmNoBtn.width - MeasureText("CANCEL", 16))/2,(int)confirmNoBtn.y + 12, 16, navy);
             }
         }
 
+        
         //Gameplay screen rendering
         else if(currentScreen == SCREEN_GAME){
-            const char *gameTitle = "HANGMAN GAMEPLAY";
-            DrawText(gameTitle, (screenWidth-MeasureText(gameTitle,28))/2,50,28,DARKBLUE);
-            const char *difficultyName =
-                (selectedDifficulty == DIFFICULTY_EASY) ? "EASY" :
-                (selectedDifficulty == DIFFICULTY_MEDIUM) ? "MEDIUM" : "HARD";
 
-            DrawText(TextFormat("Difficulty: %s", difficultyName),30, 100, 18, DARKBLUE);
+            Color pageBg = {245, 244, 239, 255};
+            Color panelBg = {255, 255, 252, 255};
+            Color navy = {36, 52, 71, 255};
+            Color teal = {70, 132, 125, 255};
+            Color tealHover = {55, 112, 106, 255};
+            Color mutedText = {112, 119, 122, 255};
+            Color border = {224, 224, 216, 255};
+            Color lightButton = {242, 244, 240, 255};
+            Color danger = {174, 83, 78, 255};
+            Color success = {70, 132, 100, 255};
 
-            //Display secret word with space padding (e.g. "_ _ A _ _")
+            ClearBackground(pageBg);
+
+            // Main heading
+            const char *gameTitle = "HANGMAN";
+            DrawBoldText(gameTitle,(screenWidth - MeasureText(gameTitle, 30))/2,25, 30, navy);
+
+            // Difficulty and category information
+            const char *difficultyName =(selectedDifficulty == DIFFICULTY_EASY) ? "EASY" :(selectedDifficulty == DIFFICULTY_MEDIUM) ? "MEDIUM" : "HARD";
+
+            DrawText(TextFormat("DIFFICULTY: %s", difficultyName),30, 80, 16, navy);
+            DrawText(TextFormat("CATEGORY: %s", categoryNames[selectedCategory]),30, 105, 16, mutedText);
+
+            // Left gameplay panel
+            Rectangle wordPanel = {25, 145, 440, 225};
+            DrawRectangleRounded(wordPanel, 0.025f, 8, panelBg);
+            DrawRectangleLinesEx(wordPanel, 1.0f, border);
+
+            // Word heading
+            DrawBoldText("GUESS THE WORD",50, 170, 17, navy);
+
+            // Display hidden and revealed letters
             char formattedWord[100] = "";
             int len = strlen(displayWord);
-            for (int i = 0; i<len;i++){
-                char temp[3] = { displayWord[i], ' ', '\0'};
+
+            for(int i = 0; i < len; i++){
+                char temp[3] = {displayWord[i], ' ', '\0'};
                 strcat(formattedWord, temp);
-            }//endfor
-            DrawText(formattedWord, (screenWidth-MeasureText(formattedWord, 36))/2,150,36,BLACK);
+            }
 
-            //Attempts counter
-            const char *attemptsStr = TextFormat("Wrong Attempts: %d / %d", wrongAttempts, maxAttempts);
-            DrawText(attemptsStr, (screenWidth-MeasureText(attemptsStr,20))/2,230,20,(wrongAttempts >=4)?RED:DARKGRAY);
+            int wordFontSize = (len > 12) ? 25 : 32;
+            int wordWidth = MeasureText(formattedWord, wordFontSize);
 
-            // Hint balance and recharge countdown
-            DrawText(TextFormat("Hints: %d/3", availableHints),30, 380, 18, DARKBLUE);
-            DrawRectangleRec(hintBtn,(!gameOver && availableHints > 0) ? BLUE : GRAY);
-            DrawText("USE HINT",(int)hintBtn.x + 30,(int)hintBtn.y + 12,16, WHITE);
+            while(wordWidth > (int)wordPanel.width - 40 && wordFontSize > 18){
+                wordFontSize--;
+                wordWidth = MeasureText(formattedWord, wordFontSize);
+            }
+            int wordX = (int)wordPanel.x + ((int)wordPanel.width - wordWidth)/2;
+            DrawBoldText(formattedWord, wordX, 225, wordFontSize, navy);
 
-            // Display remaining recharge time.
+            // Attempts counter
+            const char *attemptsStr =TextFormat("WRONG ATTEMPTS: %d / %d",wrongAttempts, maxAttempts);
+            DrawBoldText(attemptsStr,50, 295, 16,(wrongAttempts >= 4) ? danger : mutedText);
+
+            // Guessed letters
+            char guessedStr[100] = "GUESSED: ";
+            for(int i = 0; i < 26; i++){
+                if(guessedLetters[i]){
+                    char ltr[3] = {(char)('A' + i), ' ', '\0'};
+                    strcat(guessedStr, ltr);
+                }
+            }
+            DrawText(guessedStr, 50, 330, 15, mutedText);
+
+            // Hangman drawing
+            DrawHangman(wrongAttempts);
+
+            // Hint balance
+            DrawBoldText(TextFormat("HINTS: %d / 3", availableHints),30, 390, 16, navy);
+
+            // Hint button hover
+            bool hoverHint = CheckCollisionPointRec(mousePoint, hintBtn);
+            Color hintColor =(!gameOver && availableHints > 0)? (hoverHint ? tealHover : teal): border;
+            DrawRectangleRounded(hintBtn, 0.10f, 8, hintColor);
+            DrawBoldText("USE HINT",(int)hintBtn.x +((int)hintBtn.width - MeasureText("USE HINT", 16))/2,(int)hintBtn.y + 12, 16,(!gameOver && availableHints > 0) ? WHITE : mutedText);
+
+            // Hint recharge countdown
             if(availableHints < 3 && nextHintRecharge > 0){
-                long long secondsLeft = nextHintRecharge - (long long)time(NULL);
+                long long secondsLeft =nextHintRecharge - (long long)time(NULL);
                 if(secondsLeft < 0) secondsLeft = 0;
                 int hoursLeft = (int)(secondsLeft / 3600);
                 int minutesLeft = (int)((secondsLeft % 3600) / 60);
-                DrawText(TextFormat("Next hint: %02d:%02d",hoursLeft, minutesLeft), 30, 455, 16, GRAY);
+                DrawText(TextFormat("Next hint: %02d:%02d",hoursLeft, minutesLeft),30, 455, 15, mutedText);
             }
-
-            // Display selected category
-            // [DATE: 11/07/2026][MODIFIED BY: MUHAMMAD USAID]
-            DrawText(TextFormat("Category: %s", categoryNames[selectedCategory]),30, 125, 18, DARKBLUE);
-
-            //Drawing hangman according to wrong attempts
-            DrawHangman(wrongAttempts);
-
-            //Display Guessed Keyboard Letters
-            char guessedStr[100] = "Guessed: ";
-            for(int i = 0; i<26;i++){
-                if(guessedLetters[i]){
-                    char ltr[3] = { (char)('A' + i ), ' ', '\0'};
-                    strcat(guessedStr, ltr);
-                }//endif
-            }//endfor
-            DrawText(guessedStr, (screenWidth-MeasureText(guessedStr, 18))/2,290,18,GRAY);
-
-            //Game over/victory banner
+            // Game status message
             if(gameOver){
                 if(gameWon){
-                    const char *winText = "YOU WON! Press 'R' to play again.";
-                    DrawText(winText, (screenWidth-MeasureText(winText,22))/2,350,22,GREEN);
-                }else{
-                    const char *lossText = TextFormat("GAME OVER! Word was: %s. Press 'R' to try again.",secretWord);
-                    DrawText(lossText, (screenWidth-MeasureText(lossText,20))/2,350,20,RED);
+                    const char *winText = "YOU WON!";
+                    DrawBoldText(winText,(screenWidth - MeasureText(winText, 23))/2,405, 23, success);
+                    DrawText("Press R to play again",(screenWidth - MeasureText("Press R to play again", 15))/2,432, 15, mutedText);
                 }
-            }else{
-                DrawText("Type any letter A-Z on your keyboard to guess!", (screenWidth-MeasureText("Type any letter A-Z on your keyboard to guess!",16))/2,350,16,LIGHTGRAY);
+                else{
+                    const char *lossText = TextFormat("GAME OVER! Word was: %s", secretWord);
+                    DrawBoldText(lossText,(screenWidth - MeasureText(lossText, 19))/2,405, 19, danger);
+                    DrawText("Press R to try again",(screenWidth - MeasureText("Press R to try again", 15))/2,432, 15, mutedText);
+                }
             }
-
-            //Back to Menu Button
-            DrawRectangleRec(backBtn, GRAY);
+            else{
+                const char *instruction ="Type any letter A-Z to guess";
+                DrawText(instruction,(screenWidth - MeasureText(instruction, 16))/2,465, 16, mutedText);
+            }
+            // Back to Menu button
+            bool hoverBack = CheckCollisionPointRec(mousePoint, backBtn);
+            DrawRectangleRounded(backBtn, 0.10f, 8,hoverBack ? border : lightButton);
+            DrawRectangleLinesEx(backBtn, 1.0f, border);
             const char *backText = "BACK TO MENU";
-            int backTextWidth = MeasureText(backText,16);
-            DrawText(backText, (int)backBtn.x + ((int)backBtn.width-backTextWidth)/2, (int)backBtn.y + 12,16,WHITE);
+            DrawBoldText(backText,(int)backBtn.x +((int)backBtn.width - MeasureText(backText, 16))/2,(int)backBtn.y + 12, 16, navy);
 
-            //Updating player stats after game completion [DATE: 11/05/2026][MODIFIED BY: MUHAMMAD USAID]
+            // Updating player stats after game completion
             if(gameOver && !statsUpdated){
-
                 if(!updatePlayerStats(&loggedInPlayer, gameWon)){
                     TraceLog(LOG_ERROR, "Failed to save player stats!");
-                }//endif
-               statsUpdated = true;
-
-            }//endif
+                }
+                statsUpdated = true;
+            }
         }
         //output rendered frame to screen
         EndDrawing();
@@ -1142,6 +1368,12 @@ int main(void) {
     UnloadSound(loseSound);
     CloseAudioDevice();
 
+    if(gameFontLoaded){
+        UnloadFont(gameFont);
+    }
+    if(semiBoldFontLoaded){
+        UnloadFont(semiBoldFont);
+    }
     //clean up window memory before program termination
     CloseWindow();
     return 0;
